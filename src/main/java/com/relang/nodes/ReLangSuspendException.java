@@ -1,7 +1,9 @@
 package com.relang.nodes;
 
 import com.oracle.truffle.api.nodes.ControlFlowException;
-import java.util.Stack;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Exception thrown when a checkpoint is hit.
@@ -16,7 +18,8 @@ public final class ReLangSuspendException extends ControlFlowException {
     private final ResumableState state;
     
     // Temporary accumulator for path indices within the current frame during unwinding
-    private final Stack<Integer> currentPath = new Stack<>();
+    // Using ArrayList as a stack (add/remove from end)
+    private final ArrayList<Integer> currentPath = new ArrayList<>();
 
     public ReLangSuspendException() {
         this.state = new ResumableState();
@@ -30,15 +33,15 @@ public final class ReLangSuspendException extends ControlFlowException {
      * Called by BlockNode during unwinding to record which statement we were at.
      */
     public void pushPathIndex(int index) {
-        currentPath.push(index);
+        currentPath.add(index);
     }
 
     /**
      * Called by RootNode to get the accumulated path and clear it for the next frame.
+     * Returns a copy of the path as a List.
      */
-    public Stack<Integer> drainCurrentPath() {
-        Stack<Integer> copy = new Stack<>();
-        copy.addAll(currentPath);
+    public List<Integer> drainCurrentPath() {
+        List<Integer> copy = new ArrayList<>(currentPath);
         currentPath.clear();
         return copy;
     }

@@ -1,6 +1,15 @@
 package com.relang.nodes;
 
-public class SuspendedResult {
+import java.io.Serializable;
+
+/**
+ * Wrapper for ResumableState returned to the host when execution suspends.
+ * Implements Serializable so it can be persisted and restored later.
+ */
+public class SuspendedResult implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
+    
     private final ResumableState state;
 
     public SuspendedResult(ResumableState state) {

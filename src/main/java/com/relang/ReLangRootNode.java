@@ -9,8 +9,8 @@ import com.relang.nodes.ReLangSuspendException;
 import com.relang.nodes.ResumableState;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 
 /**
  * The root node for a ReLang function.
@@ -49,7 +49,7 @@ public class ReLangRootNode extends RootNode {
         } catch (ReLangSuspendException e) {
             // UNWINDING: Capture this frame's state and re-throw
             Map<String, Object> locals = captureLocals(frame);
-            Stack<Integer> path = e.drainCurrentPath();  // Get path accumulated by BlockNodes
+            List<Integer> path = e.drainCurrentPath();  // Get path accumulated by BlockNodes
             ResumableState.FrameState frameState = new ResumableState.FrameState(locals, path);
             e.getState().pushFrame(frameState);
             throw e;
