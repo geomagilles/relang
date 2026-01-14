@@ -1,5 +1,8 @@
 package com.relang;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
 import org.graalvm.polyglot.Context;
@@ -252,47 +255,49 @@ public class ReLangResumabilityTest {
     }
 
     @Test
-    void testJsonSerializationRoundTrip() {
+    void testJsonStructureSimple() {
         String src = """
-                fn compute() {
-                    x = 42;
-                    y = 100;
-                    checkpoint;
-                    return x + y;
-                }
-                compute();
+                x = 42;
+                checkpoint;
+                x;
                 """;
 
-        // First run: hits checkpoint
         Value result1 = context.eval("relang", src);
-        SuspendedResult original = result1.asHostObject();
+        SuspendedResult suspended = result1.asHostObject();
 
-        // Serialize to JSON
-        String json = original.toJson();
+        String json = suspended.toJson();
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+
+        // Verify root structure
+        assertTrue(root.has("frames"), "Root should have 'frames' array");
+        JsonArray frames = root.getAsJsonArray("frames");
         
-        // Verify JSON is valid and contains expected data
-        assertNotNull(json);
-        assertTrue(json.contains("frames"));
-        assertTrue(json.contains("locals"));
-        assertTrue(json.contains("executionPath"));
-        
-        // Deserialize from JSON
+        // Top-level code has 1 frame
+        assertEquals(1, frames.size(), "Should have 1 frame for top-level code");
+
+        // Check the frame structure
+        JsonObject frame = frames.get(0).getAsJsonObject();
+        assertTrue(frame.has("locals"), "Frame should have 'locals'");
+        assertTrue(frame.has("executionPath"), "Frame should have 'executionPath'");
+
+        // Verify locals
+        JsonObject locals = frame.getAsJsonObject("locals");
+        assertTrue(locals.has("x"), "Locals should contain 'x'");
+        assertEquals(42, locals.get("x").getAsLong(), "x should be 42");
+
+        // Verify execution path
+        JsonArray path = frame.getAsJsonArray("executionPath");
+        assertNotNull(path, "executionPath should be an array");
+        assertTrue(path.size() > 0, "executionPath should not be empty");
+
+        // Verify round-trip works
         SuspendedResult deserialized = SuspendedResult.fromJson(json);
-
-        // Verify deserialized state
-        assertNotNull(deserialized);
-        assertNotNull(deserialized.getState());
-        assertEquals(original.getState().getFrameCount(), deserialized.getState().getFrameCount());
-
-        // Resume with deserialized state
         context.getPolyglotBindings().putMember("resumeState", deserialized);
-        Value result2 = context.eval("relang", src);
-
-        assertEquals(142, result2.asLong());
+        assertEquals(42, context.eval("relang", src).asLong());
     }
 
     @Test
-    void testJsonSerializationWithBooleans() {
+    void testJsonStructureWithBooleans() {
         String src = """
                 x = 1;
                 flag = 1 < 2;
@@ -302,22 +307,34 @@ public class ReLangResumabilityTest {
                 """;
 
         Value result1 = context.eval("relang", src);
-        SuspendedResult original = result1.asHostObject();
+        SuspendedResult suspended = result1.asHostObject();
 
-        // Serialize to JSON and back
-        String json = original.toJson();
-        assertTrue(json.contains("true"), "JSON should contain boolean true");
-        
+        String json = suspended.toJson();
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        JsonArray frames = root.getAsJsonArray("frames");
+
+        // Find the frame with our variables
+        JsonObject frameWithVars = frames.get(0).getAsJsonObject();
+        JsonObject locals = frameWithVars.getAsJsonObject("locals");
+
+        // Verify Long type
+        assertTrue(locals.has("x"), "Locals should contain 'x'");
+        assertTrue(locals.get("x").getAsJsonPrimitive().isNumber(), "x should be a number");
+        assertEquals(1, locals.get("x").getAsLong());
+
+        // Verify Boolean type
+        assertTrue(locals.has("flag"), "Locals should contain 'flag'");
+        assertTrue(locals.get("flag").getAsJsonPrimitive().isBoolean(), "flag should be a boolean");
+        assertTrue(locals.get("flag").getAsBoolean(), "flag should be true");
+
+        // Verify round-trip preserves types and execution works
         SuspendedResult deserialized = SuspendedResult.fromJson(json);
-
         context.getPolyglotBindings().putMember("resumeState", deserialized);
-        Value result2 = context.eval("relang", src);
-
-        assertEquals(101, result2.asLong());
+        assertEquals(101, context.eval("relang", src).asLong());
     }
 
     @Test
-    void testJsonSerializationWithNestedCalls() {
+    void testJsonStructureNestedCalls() {
         String src = """
                 fn inner() {
                     a = 10;
@@ -333,24 +350,124 @@ public class ReLangResumabilityTest {
                 """;
 
         Value result1 = context.eval("relang", src);
-        SuspendedResult original = result1.asHostObject();
+        SuspendedResult suspended = result1.asHostObject();
 
-        // Convert to JSON and back
-        String json = original.toJson();
+        String json = suspended.toJson();
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        JsonArray frames = root.getAsJsonArray("frames");
+
+        // Should have multiple frames for nested calls
+        assertTrue(frames.size() >= 3, "Should have at least 3 frames (inner, outer, top-level)");
+
+        // Verify inner() frame has 'a'
+        boolean foundA = false;
+        boolean foundB = false;
+        for (int i = 0; i < frames.size(); i++) {
+            JsonObject frame = frames.get(i).getAsJsonObject();
+            JsonObject locals = frame.getAsJsonObject("locals");
+            if (locals.has("a")) {
+                assertEquals(10, locals.get("a").getAsLong(), "a should be 10");
+                foundA = true;
+            }
+            if (locals.has("b")) {
+                assertEquals(5, locals.get("b").getAsLong(), "b should be 5");
+                foundB = true;
+            }
+        }
+        assertTrue(foundA, "Should find variable 'a' from inner()");
+        assertTrue(foundB, "Should find variable 'b' from outer()");
+
+        // Each frame should have valid structure
+        for (int i = 0; i < frames.size(); i++) {
+            JsonObject frame = frames.get(i).getAsJsonObject();
+            assertTrue(frame.has("locals"), "Frame " + i + " should have 'locals'");
+            assertTrue(frame.has("executionPath"), "Frame " + i + " should have 'executionPath'");
+            assertTrue(frame.get("locals").isJsonObject(), "locals should be an object");
+            assertTrue(frame.get("executionPath").isJsonArray(), "executionPath should be an array");
+        }
+
+        // Verify round-trip works
         SuspendedResult deserialized = SuspendedResult.fromJson(json);
-
-        // Verify frame count preserved
-        assertEquals(original.getState().getFrameCount(), deserialized.getState().getFrameCount());
-
-        // Resume with deserialized state
         context.getPolyglotBindings().putMember("resumeState", deserialized);
-        Value result2 = context.eval("relang", src);
-
-        assertEquals(35, result2.asLong());
+        assertEquals(35, context.eval("relang", src).asLong());
     }
 
     @Test
-    void testJsonIsHumanReadable() {
+    void testJsonStructureMultipleVariables() {
+        String src = """
+                a = 1;
+                b = 2;
+                c = 3;
+                d = 4;
+                e = 5;
+                checkpoint;
+                a + b + c + d + e;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        String json = suspended.toJson();
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        JsonArray frames = root.getAsJsonArray("frames");
+
+        // Find frame with all variables
+        JsonObject frameWithVars = frames.get(0).getAsJsonObject();
+        JsonObject locals = frameWithVars.getAsJsonObject("locals");
+
+        // Verify all variables present with correct values
+        assertEquals(1, locals.get("a").getAsLong());
+        assertEquals(2, locals.get("b").getAsLong());
+        assertEquals(3, locals.get("c").getAsLong());
+        assertEquals(4, locals.get("d").getAsLong());
+        assertEquals(5, locals.get("e").getAsLong());
+
+        // Verify round-trip
+        SuspendedResult deserialized = SuspendedResult.fromJson(json);
+        context.getPolyglotBindings().putMember("resumeState", deserialized);
+        assertEquals(15, context.eval("relang", src).asLong());
+    }
+
+    @Test
+    void testJsonExecutionPathStructure() {
+        String src = """
+                x = 1;
+                x = x + 1;
+                x = x + 1;
+                checkpoint;
+                x = x + 1;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        String json = suspended.toJson();
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        JsonArray frames = root.getAsJsonArray("frames");
+
+        // Check execution path contains integers
+        JsonObject frame = frames.get(0).getAsJsonObject();
+        JsonArray path = frame.getAsJsonArray("executionPath");
+        
+        for (int i = 0; i < path.size(); i++) {
+            assertTrue(path.get(i).getAsJsonPrimitive().isNumber(), 
+                "Path element " + i + " should be a number");
+        }
+
+        // The path should point past the checkpoint (index 4 = after checkpoint at index 3)
+        assertFalse(path.isEmpty(), "Path should not be empty");
+        int resumeIndex = path.get(path.size() - 1).getAsInt();
+        assertEquals(4, resumeIndex, "Should resume at statement after checkpoint");
+
+        // Verify round-trip
+        SuspendedResult deserialized = SuspendedResult.fromJson(json);
+        context.getPolyglotBindings().putMember("resumeState", deserialized);
+        assertEquals(4, context.eval("relang", src).asLong());
+    }
+
+    @Test
+    void testJsonPrettyPrinted() {
         String src = """
                 myVar = 42;
                 checkpoint;
@@ -362,9 +479,12 @@ public class ReLangResumabilityTest {
 
         String json = suspended.toJson();
         
-        // Verify the JSON is pretty-printed and readable
-        assertTrue(json.contains("\n"), "JSON should be pretty-printed");
-        assertTrue(json.contains("myVar"), "JSON should contain variable name");
-        assertTrue(json.contains("42"), "JSON should contain variable value");
+        // Verify pretty-printed format
+        assertTrue(json.contains("\n"), "JSON should be pretty-printed with newlines");
+        assertTrue(json.contains("  "), "JSON should have indentation");
+        
+        // Should still be valid JSON
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        assertNotNull(root);
     }
 }
