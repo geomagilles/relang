@@ -250,4 +250,121 @@ public class ReLangResumabilityTest {
         // inner() returns 10*3=30, outer() returns 5+30=35
         assertEquals(35, result2.asLong());
     }
+
+    @Test
+    void testJsonSerializationRoundTrip() {
+        String src = """
+                fn compute() {
+                    x = 42;
+                    y = 100;
+                    checkpoint;
+                    return x + y;
+                }
+                compute();
+                """;
+
+        // First run: hits checkpoint
+        Value result1 = context.eval("relang", src);
+        SuspendedResult original = result1.asHostObject();
+
+        // Serialize to JSON
+        String json = original.toJson();
+        
+        // Verify JSON is valid and contains expected data
+        assertNotNull(json);
+        assertTrue(json.contains("frames"));
+        assertTrue(json.contains("locals"));
+        assertTrue(json.contains("executionPath"));
+        
+        // Deserialize from JSON
+        SuspendedResult deserialized = SuspendedResult.fromJson(json);
+
+        // Verify deserialized state
+        assertNotNull(deserialized);
+        assertNotNull(deserialized.getState());
+        assertEquals(original.getState().getFrameCount(), deserialized.getState().getFrameCount());
+
+        // Resume with deserialized state
+        context.getPolyglotBindings().putMember("resumeState", deserialized);
+        Value result2 = context.eval("relang", src);
+
+        assertEquals(142, result2.asLong());
+    }
+
+    @Test
+    void testJsonSerializationWithBooleans() {
+        String src = """
+                x = 1;
+                flag = 1 < 2;
+                checkpoint;
+                if (flag) { x = x + 100; }
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult original = result1.asHostObject();
+
+        // Serialize to JSON and back
+        String json = original.toJson();
+        assertTrue(json.contains("true"), "JSON should contain boolean true");
+        
+        SuspendedResult deserialized = SuspendedResult.fromJson(json);
+
+        context.getPolyglotBindings().putMember("resumeState", deserialized);
+        Value result2 = context.eval("relang", src);
+
+        assertEquals(101, result2.asLong());
+    }
+
+    @Test
+    void testJsonSerializationWithNestedCalls() {
+        String src = """
+                fn inner() {
+                    a = 10;
+                    checkpoint;
+                    return a * 3;
+                }
+                fn outer() {
+                    b = 5;
+                    result = inner();
+                    return b + result;
+                }
+                outer();
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult original = result1.asHostObject();
+
+        // Convert to JSON and back
+        String json = original.toJson();
+        SuspendedResult deserialized = SuspendedResult.fromJson(json);
+
+        // Verify frame count preserved
+        assertEquals(original.getState().getFrameCount(), deserialized.getState().getFrameCount());
+
+        // Resume with deserialized state
+        context.getPolyglotBindings().putMember("resumeState", deserialized);
+        Value result2 = context.eval("relang", src);
+
+        assertEquals(35, result2.asLong());
+    }
+
+    @Test
+    void testJsonIsHumanReadable() {
+        String src = """
+                myVar = 42;
+                checkpoint;
+                myVar;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        String json = suspended.toJson();
+        
+        // Verify the JSON is pretty-printed and readable
+        assertTrue(json.contains("\n"), "JSON should be pretty-printed");
+        assertTrue(json.contains("myVar"), "JSON should contain variable name");
+        assertTrue(json.contains("42"), "JSON should contain variable value");
+    }
 }

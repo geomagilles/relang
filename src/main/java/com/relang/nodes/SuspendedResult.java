@@ -4,7 +4,7 @@ import java.io.Serializable;
 
 /**
  * Wrapper for ResumableState returned to the host when execution suspends.
- * Implements Serializable so it can be persisted and restored later.
+ * Supports both Java serialization and JSON serialization.
  */
 public class SuspendedResult implements Serializable {
     
@@ -18,5 +18,19 @@ public class SuspendedResult implements Serializable {
 
     public ResumableState getState() {
         return state;
+    }
+    
+    /**
+     * Serialize this result to a JSON string.
+     */
+    public String toJson() {
+        return state.toJson();
+    }
+    
+    /**
+     * Deserialize a SuspendedResult from a JSON string.
+     */
+    public static SuspendedResult fromJson(String json) {
+        return new SuspendedResult(ResumableState.fromJson(json));
     }
 }
