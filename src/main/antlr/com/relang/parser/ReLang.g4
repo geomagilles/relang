@@ -26,6 +26,7 @@ statement
     | 'if' '(' expr ')' block ('else' block)?  # StatementIf
     | 'while' '(' expr ')' block      # StatementWhile
     | 'return' expr ';'               # StatementReturn
+    | 'checkpoint' ';'                # StatementCheckpoint
     | expr ';'                        # StatementExpr
     ;
 

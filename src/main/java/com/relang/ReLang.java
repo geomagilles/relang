@@ -3,9 +3,11 @@ package com.relang;
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.RootCallTarget;
+import com.oracle.truffle.api.frame.FrameDescriptor;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.RootNode;
-import com.relang.nodes.ReLangNode;
-import com.relang.nodes.LongLiteralNode;
+import com.relang.nodes.ReLangSuspendException;
+import com.relang.nodes.SuspendedResult;
 
 import java.util.Map;
 
@@ -22,6 +24,39 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
         Map<String, RootCallTarget> functions = com.relang.parser.ReLangTruffleParser.parse(this, request.getSource());
         ReLangContext context = getCurrentContext(ReLang.class);
         context.getFunctionRegistry().putAll(functions);
-        return functions.get("main");
+
+        // Get the entry point (main body or main function)
+        RootCallTarget entryPoint;
+        if (functions.containsKey("")) {
+            entryPoint = functions.get("");
+        } else {
+            entryPoint = functions.get("main");
+        }
+
+        // Wrap in a top-level node that catches ReLangSuspendException
+        return new TopLevelRootNode(this, entryPoint).getCallTarget();
+    }
+
+    /**
+     * Top-level wrapper that catches ReLangSuspendException and converts it to SuspendedResult.
+     */
+    private static class TopLevelRootNode extends RootNode {
+        private final RootCallTarget entryPoint;
+
+        TopLevelRootNode(ReLang language, RootCallTarget entryPoint) {
+            super(language, FrameDescriptor.newBuilder().build());
+            this.entryPoint = entryPoint;
+        }
+
+        @Override
+        public Object execute(VirtualFrame frame) {
+            ReLangContext context = ReLangContext.get(this);
+            try {
+                return entryPoint.call();
+            } catch (ReLangSuspendException e) {
+                // Convert exception to SuspendedResult for the host
+                return context.getEnv().asGuestValue(new SuspendedResult(e.getState()));
+            }
+        }
     }
 }

@@ -14,6 +14,7 @@ public abstract class ReLangNode extends Node {
 
     /**
      * The execute method that every node must implement.
+     * Frame state for resumability is passed via ReLangContext.getActiveFrameState().
      */
     public abstract Object executeGeneric(VirtualFrame frame);
 

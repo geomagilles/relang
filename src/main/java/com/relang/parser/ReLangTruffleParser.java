@@ -102,7 +102,7 @@ public class ReLangTruffleParser {
         ReLangNode mainBody = new ReLangBlockNode(mainNodes.toArray(new ReLangNode[0]));
         ReLangRootNode mainRoot = new ReLangRootNode(language, mainContext.frameBuilder.build(), mainBody);
 
-        functions.put("main", mainRoot.getCallTarget());
+        functions.put("", mainRoot.getCallTarget());
         return functions;
     }
 
@@ -125,6 +125,8 @@ public class ReLangTruffleParser {
             return parseWhile(context, (ReLangParser.StatementWhileContext) ctx);
         } else if (ctx instanceof ReLangParser.StatementReturnContext) {
             return new ReLangReturnNode(parseExpr(context, ((ReLangParser.StatementReturnContext) ctx).expr()));
+        } else if (ctx instanceof ReLangParser.StatementCheckpointContext) {
+            return new com.relang.nodes.ReLangCheckpointNode();
         }
         throw new RuntimeException("Unknown statement type: " + ctx.getClass().getSimpleName());
     }

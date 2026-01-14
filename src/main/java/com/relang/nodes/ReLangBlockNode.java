@@ -3,7 +3,14 @@ package com.relang.nodes;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.relang.ReLangContext;
 
+/**
+ * Executes a sequence of statements.
+ * Handles path tracking for resumability:
+ * - REWINDING (resume): Pops path index from FrameState to skip forward
+ * - UNWINDING (suspend): Catches exception, pushes current index, re-throws
+ */
 @NodeInfo(shortName = "block", description = "The node implementing a source code block")
 public final class ReLangBlockNode extends ReLangNode {
 
@@ -21,12 +28,37 @@ public final class ReLangBlockNode extends ReLangNode {
             return 0L;
         }
 
-        // Execute all but the last one
-        for (int i = 0; i < bodyNodes.length - 1; i++) {
-            bodyNodes[i].executeGeneric(frame);
+        // Get frame state from context (set by RootNode during resume)
+        ReLangContext context = ReLangContext.get(this);
+        ResumableState.FrameState frameState = context.getActiveFrameState();
+
+        int startIndex = 0;
+
+        // REWINDING: Skip to where we left off
+        if (frameState != null && frameState.hasPath()) {
+            startIndex = frameState.popPathIndex();
         }
 
-        // Return result of the last one
-        return bodyNodes[bodyNodes.length - 1].executeGeneric(frame);
+        if (startIndex >= bodyNodes.length) {
+            return 0L;
+        }
+
+        // Execute statements
+        Object result = 0L;
+        for (int i = startIndex; i < bodyNodes.length; i++) {
+            try {
+                result = bodyNodes[i].executeGeneric(frame);
+            } catch (ReLangSuspendException e) {
+                // UNWINDING: Record which statement we were at
+                // For checkpoint, resume at NEXT statement; for nested calls, resume at same statement
+                if (bodyNodes[i] instanceof ReLangCheckpointNode) {
+                    e.pushPathIndex(i + 1);
+                } else {
+                    e.pushPathIndex(i);
+                }
+                throw e;
+            }
+        }
+        return result;
     }
 }

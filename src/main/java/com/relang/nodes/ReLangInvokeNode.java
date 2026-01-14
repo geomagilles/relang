@@ -1,6 +1,5 @@
 package com.relang.nodes;
 
-import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -8,8 +7,12 @@ import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.relang.ReLangContext;
-import com.relang.ReLang;
 
+/**
+ * Function call node.
+ * With exception-based suspension, we don't need any special handling here -
+ * ReLangSuspendException propagates naturally through the call.
+ */
 @NodeInfo(shortName = "invoke", description = "The node implementing a function call")
 public final class ReLangInvokeNode extends ReLangNode {
 
@@ -29,20 +32,21 @@ public final class ReLangInvokeNode extends ReLangNode {
     public Object executeGeneric(VirtualFrame frame) {
         if (callNode == null) {
             CompilerAsserts.neverPartOfCompilation("CallNode lookup should happen only once in interpreter");
-            // Lookup function
             ReLangContext context = ReLangContext.get(this);
-            CallTarget target = context.getFunctionRegistry().get(functionName);
+            var target = context.getFunctionRegistry().get(functionName);
             if (target == null) {
                 throw new RuntimeException("Function not found: " + functionName);
             }
             callNode = insert(Truffle.getRuntime().createDirectCallNode(target));
         }
 
+        // Evaluate arguments - exceptions propagate naturally
         Object[] args = new Object[argumentNodes.length];
         for (int i = 0; i < argumentNodes.length; i++) {
             args[i] = argumentNodes[i].executeGeneric(frame);
         }
 
+        // Call function - ReLangSuspendException propagates naturally
         return callNode.call(args);
     }
 }
