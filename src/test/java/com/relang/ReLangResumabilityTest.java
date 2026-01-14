@@ -5,6 +5,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
+import com.relang.proto.ResumableStateProtos.ResumableStateProto;
+import com.relang.proto.ResumableStateProtos.FrameStateProto;
+import com.relang.proto.ResumableStateProtos.LocalValue;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
@@ -486,5 +489,196 @@ public class ReLangResumabilityTest {
         // Should still be valid JSON
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         assertNotNull(root);
+    }
+
+    // ==================== Protobuf Serialization Tests ====================
+
+    @Test
+    void testProtoSerializationRoundTrip() throws Exception {
+        String src = """
+                fn compute() {
+                    x = 42;
+                    y = 100;
+                    checkpoint;
+                    return x + y;
+                }
+                compute();
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult original = result1.asHostObject();
+
+        // Serialize to protobuf bytes
+        byte[] protoBytes = original.toProtoBytes();
+        
+        // Verify we got some bytes (should be compact)
+        assertTrue(protoBytes.length > 0, "Protobuf bytes should not be empty");
+        assertTrue(protoBytes.length < 200, "Protobuf should be compact");
+
+        // Deserialize from protobuf bytes
+        SuspendedResult deserialized = SuspendedResult.fromProtoBytes(protoBytes);
+
+        // Verify state preserved
+        assertNotNull(deserialized);
+        assertEquals(original.getState().getFrameCount(), deserialized.getState().getFrameCount());
+
+        // Resume with deserialized state
+        context.getPolyglotBindings().putMember("resumeState", deserialized);
+        Value result2 = context.eval("relang", src);
+
+        assertEquals(142, result2.asLong());
+    }
+
+    @Test
+    void testProtoStructure() throws Exception {
+        String src = """
+                x = 42;
+                flag = 1 < 2;
+                checkpoint;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Get the proto message directly
+        ResumableStateProto proto = suspended.toProto();
+
+        // Verify structure
+        assertEquals(1, proto.getFramesCount(), "Should have 1 frame");
+        
+        FrameStateProto frame = proto.getFrames(0);
+        
+        // Check locals
+        assertTrue(frame.containsLocals("x"), "Should have local 'x'");
+        assertTrue(frame.containsLocals("flag"), "Should have local 'flag'");
+        
+        LocalValue xValue = frame.getLocalsOrThrow("x");
+        assertTrue(xValue.hasLongValue(), "x should be a long");
+        assertEquals(42, xValue.getLongValue());
+        
+        LocalValue flagValue = frame.getLocalsOrThrow("flag");
+        assertTrue(flagValue.hasBoolValue(), "flag should be a boolean");
+        assertTrue(flagValue.getBoolValue());
+        
+        // Check execution path
+        assertTrue(frame.getExecutionPathCount() > 0, "Should have execution path");
+
+        // Verify round-trip works
+        SuspendedResult deserialized = SuspendedResult.fromProto(proto);
+        context.getPolyglotBindings().putMember("resumeState", deserialized);
+        assertEquals(42, context.eval("relang", src).asLong());
+    }
+
+    @Test
+    void testProtoWithNestedCalls() throws Exception {
+        String src = """
+                fn inner() {
+                    a = 10;
+                    checkpoint;
+                    return a * 3;
+                }
+                fn outer() {
+                    b = 5;
+                    result = inner();
+                    return b + result;
+                }
+                outer();
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult original = result1.asHostObject();
+
+        // Serialize to protobuf
+        byte[] protoBytes = original.toProtoBytes();
+        ResumableStateProto proto = ResumableStateProto.parseFrom(protoBytes);
+
+        // Verify multiple frames
+        assertTrue(proto.getFramesCount() >= 3, "Should have at least 3 frames");
+
+        // Find frames with our variables
+        boolean foundA = false;
+        boolean foundB = false;
+        for (FrameStateProto frame : proto.getFramesList()) {
+            if (frame.containsLocals("a")) {
+                assertEquals(10, frame.getLocalsOrThrow("a").getLongValue());
+                foundA = true;
+            }
+            if (frame.containsLocals("b")) {
+                assertEquals(5, frame.getLocalsOrThrow("b").getLongValue());
+                foundB = true;
+            }
+        }
+        assertTrue(foundA, "Should find variable 'a' from inner()");
+        assertTrue(foundB, "Should find variable 'b' from outer()");
+
+        // Verify round-trip works
+        SuspendedResult deserialized = SuspendedResult.fromProtoBytes(protoBytes);
+        context.getPolyglotBindings().putMember("resumeState", deserialized);
+        assertEquals(35, context.eval("relang", src).asLong());
+    }
+
+    @Test
+    void testProtoSmallerThanJson() {
+        String src = """
+                a = 1;
+                b = 2;
+                c = 3;
+                d = 4;
+                e = 5;
+                checkpoint;
+                a + b + c + d + e;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        byte[] protoBytes = suspended.toProtoBytes();
+        String json = suspended.toJson();
+
+        // Protobuf should be significantly smaller
+        assertTrue(protoBytes.length < json.length(), 
+            "Protobuf (" + protoBytes.length + " bytes) should be smaller than JSON (" + json.length() + " bytes)");
+        
+        // Typically 3-5x smaller
+        double ratio = (double) json.length() / protoBytes.length;
+        assertTrue(ratio > 2.0, 
+            "JSON should be at least 2x larger than protobuf (actual ratio: " + ratio + ")");
+    }
+
+    @Test
+    void testProtoAndJsonProduceSameResult() throws Exception {
+        String src = """
+                fn work() {
+                    x = 123;
+                    flag = 1 == 1;
+                    checkpoint;
+                    if (flag) { return x * 2; }
+                    return 0;
+                }
+                work();
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult original = result1.asHostObject();
+
+        // Serialize both ways
+        String json = original.toJson();
+        byte[] protoBytes = original.toProtoBytes();
+
+        // Deserialize both
+        SuspendedResult fromJson = SuspendedResult.fromJson(json);
+        SuspendedResult fromProto = SuspendedResult.fromProtoBytes(protoBytes);
+
+        // Both should produce the same result when resumed
+        context.getPolyglotBindings().putMember("resumeState", fromJson);
+        long jsonResult = context.eval("relang", src).asLong();
+
+        context.getPolyglotBindings().putMember("resumeState", fromProto);
+        long protoResult = context.eval("relang", src).asLong();
+
+        assertEquals(246, jsonResult);
+        assertEquals(246, protoResult);
+        assertEquals(jsonResult, protoResult, "JSON and Protobuf should produce identical results");
     }
 }

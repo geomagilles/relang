@@ -6,6 +6,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.relang.proto.ResumableStateProtos;
+import com.relang.proto.ResumableStateProtos.FrameStateProto;
+import com.relang.proto.ResumableStateProtos.LocalValue;
+import com.relang.proto.ResumableStateProtos.ResumableStateProto;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -18,7 +23,10 @@ import java.util.Stack;
  * Represents the suspended execution state that can be serialized and restored later.
  * Contains a stack of FrameState objects representing the call stack at suspension.
  * 
- * Supports both Java serialization and JSON serialization for flexibility.
+ * Supports multiple serialization formats:
+ * - Java serialization (Serializable)
+ * - JSON (toJson/fromJson)
+ * - Protocol Buffers (toProto/fromProto)
  */
 public class ResumableState implements Serializable {
     
@@ -83,6 +91,46 @@ public class ResumableState implements Serializable {
         }
         
         return state;
+    }
+    
+    /**
+     * Serialize this state to a Protocol Buffer message.
+     */
+    public ResumableStateProto toProto() {
+        ResumableStateProto.Builder builder = ResumableStateProto.newBuilder();
+        
+        for (FrameState frame : frames) {
+            builder.addFrames(frame.toProto());
+        }
+        
+        return builder.build();
+    }
+    
+    /**
+     * Serialize this state to Protocol Buffer bytes.
+     */
+    public byte[] toProtoBytes() {
+        return toProto().toByteArray();
+    }
+    
+    /**
+     * Deserialize a ResumableState from a Protocol Buffer message.
+     */
+    public static ResumableState fromProto(ResumableStateProto proto) {
+        ResumableState state = new ResumableState();
+        
+        for (FrameStateProto frameProto : proto.getFramesList()) {
+            state.pushFrame(FrameState.fromProto(frameProto));
+        }
+        
+        return state;
+    }
+    
+    /**
+     * Deserialize a ResumableState from Protocol Buffer bytes.
+     */
+    public static ResumableState fromProtoBytes(byte[] bytes) throws InvalidProtocolBufferException {
+        return fromProto(ResumableStateProto.parseFrom(bytes));
     }
 
     /**
@@ -203,6 +251,58 @@ public class ResumableState implements Serializable {
             for (JsonElement elem : pathArray) {
                 path.add(elem.getAsInt());
             }
+            
+            return new FrameState(locals, path);
+        }
+        
+        /**
+         * Convert this frame to a Protocol Buffer message.
+         */
+        FrameStateProto toProto() {
+            FrameStateProto.Builder builder = FrameStateProto.newBuilder();
+            
+            // Convert locals
+            for (Map.Entry<String, Object> entry : locals.entrySet()) {
+                LocalValue.Builder valueBuilder = LocalValue.newBuilder();
+                Object value = entry.getValue();
+                
+                if (value instanceof Long) {
+                    valueBuilder.setLongValue((Long) value);
+                } else if (value instanceof Boolean) {
+                    valueBuilder.setBoolValue((Boolean) value);
+                }
+                // null values are represented by an empty LocalValue (no field set)
+                
+                builder.putLocals(entry.getKey(), valueBuilder.build());
+            }
+            
+            // Convert execution path
+            for (Integer idx : executionPath) {
+                builder.addExecutionPath(idx);
+            }
+            
+            return builder.build();
+        }
+        
+        /**
+         * Create a FrameState from a Protocol Buffer message.
+         */
+        static FrameState fromProto(FrameStateProto proto) {
+            Map<String, Object> locals = new HashMap<>();
+            
+            for (Map.Entry<String, LocalValue> entry : proto.getLocalsMap().entrySet()) {
+                LocalValue value = entry.getValue();
+                
+                if (value.hasLongValue()) {
+                    locals.put(entry.getKey(), value.getLongValue());
+                } else if (value.hasBoolValue()) {
+                    locals.put(entry.getKey(), value.getBoolValue());
+                } else {
+                    locals.put(entry.getKey(), null);
+                }
+            }
+            
+            List<Integer> path = new ArrayList<>(proto.getExecutionPathList());
             
             return new FrameState(locals, path);
         }

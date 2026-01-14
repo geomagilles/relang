@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package com.relang.proto;
+
+option java_package = "com.relang.proto";
+option java_outer_classname = "ResumableStateProtos";
+
+// A local variable value - can be either a long or a boolean
+message LocalValue {
+  oneof value {
+    int64 long_value = 1;
+    bool bool_value = 2;
+  }
+}
+
+// A single stack frame's state
+message FrameStateProto {
+  // Local variables: name -> value
+  map<string, LocalValue> locals = 1;
+  
+  // Execution path indices (statement positions)
+  repeated int32 execution_path = 2;
+}
+
+// The complete resumable state (call stack)
+message ResumableStateProto {
+  // Stack of frames (first = bottom, last = top)
+  repeated FrameStateProto frames = 1;
+}

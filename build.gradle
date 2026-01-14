@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'antlr'
+    id 'com.google.protobuf' version '0.9.4'
 }
 
 group = 'com.relang'
@@ -24,8 +25,17 @@ dependencies {
     // JSON serialization for ResumableState
     implementation 'com.google.code.gson:gson:2.11.0'
     
+    // Protobuf serialization for ResumableState
+    implementation 'com.google.protobuf:protobuf-java:4.28.2'
+    
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:4.28.2'
+    }
 }
 
 test {
