@@ -1,0 +1,44 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'antlr'
+}
+
+group = 'com.relang'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    antlr "org.antlr:antlr4:4.13.1"
+    implementation "org.antlr:antlr4-runtime:4.13.1"
+    
+    implementation 'org.graalvm.truffle:truffle-api:24.0.0'
+    implementation 'org.graalvm.polyglot:polyglot:24.0.0'
+    
+    // Annotation processor for Truffle DSL
+    annotationProcessor 'org.graalvm.truffle:truffle-dsl-processor:24.0.0'
+    
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = 'com.relang.ReLangLauncher'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs << "-parameters"
+}
