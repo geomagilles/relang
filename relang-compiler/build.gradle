@@ -8,6 +8,19 @@ dependencies {
     implementation project(':relang-core')
     implementation libs.graalvm.polyglot
     implementation libs.protobuf.java
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+test {
+    useJUnitPlatform()
+
+    // Pass classpath to tests for running the compiler
+    systemProperty 'relang.compiler.classpath', sourceSets.main.runtimeClasspath.asPath
+
+    // Tests depend on classes being compiled
+    dependsOn 'classes'
 }
 
 application {

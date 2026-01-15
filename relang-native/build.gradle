@@ -5,6 +5,19 @@ plugins {
 
 dependencies {
     implementation project(':relang-core')
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+test {
+    useJUnitPlatform()
+
+    // Pass the native binary path to tests
+    systemProperty 'relang.native.binary', layout.buildDirectory.file('native/nativeCompile/relang').get().asFile.absolutePath
+
+    // Tests depend on the native binary being built
+    dependsOn 'nativeCompile'
 }
 
 graalvmNative {
