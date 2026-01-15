@@ -58,36 +58,27 @@ In the sandbox IDE (or your regular IntelliJ):
 2. Search for **LSP4IJ** and install it
 3. Restart the IDE
 
-### Step 2: Start the LSP server
-
-In a terminal (from the project root):
-```bash
-./gradlew :relang-core:run --args="--lsp"
-```
-
-You should see:
-```
-Starting ReLang LSP server on port 8123...
-[Graal LSP] Starting server and listening on localhost/127.0.0.1:8123
-```
-
-Keep this terminal running.
-
-### Step 3: Configure LSP4IJ
+### Step 2: Configure LSP4IJ
 
 In IntelliJ:
 1. Go to `Settings` → `Languages & Frameworks` → `Language Servers`
 2. Click `+` to add a new server
-3. Configure:
+3. In the **Server** tab, configure:
    - **Name**: `ReLang`
-   - **Server**: Select `TCP` mode
-   - **Host**: `localhost`
-   - **Port**: `8123`
+   - **Command**:
+     ```
+     /path/to/relang/gradlew -p /path/to/relang :relang-core:run --args="--lsp" --console=plain -q
+     ```
+     Replace `/path/to/relang` with your actual project path, e.g.:
+     ```
+     /Users/gilles/dev/relang/gradlew -p /Users/gilles/dev/relang :relang-core:run --args="--lsp" --console=plain -q
+     ```
 4. In the **Mappings** tab, add:
-   - **File pattern**: `*.re`
+   - **Language ID**: `relang`
+   - **File name patterns**: `*.re`
 5. Click `OK`
 
-### Step 4: Test LSP features
+### Step 3: Test LSP features
 
 Open a `.re` file. You should now have:
 - Error diagnostics (red underlines for syntax errors)
@@ -149,10 +140,10 @@ relang-intellij/
 - Verify file has `.re` extension
 - Try restarting IntelliJ (the TextMate bundle is extracted on first load)
 
-**LSP not connecting?**
-- Verify the LSP server is running: `./gradlew :relang-core:run --args="--lsp"`
-- Check LSP4IJ is configured with TCP mode, host `localhost`, port `8123`
+**LSP not working?**
+- Check the command path in LSP4IJ settings is correct (use absolute paths)
 - Check LSP4IJ mappings include `*.re`
+- View LSP logs: `View` → `Tool Windows` → `Language Servers`
 
 **Build fails?**
 - Ensure GraalVM 25+ is configured
