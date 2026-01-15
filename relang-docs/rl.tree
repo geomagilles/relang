@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE instance-profile SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
+<instance-profile id="rl"
+                  name="ReLang Documentation"
+                  start-page="overview.md">
+
+    <toc-element topic="overview.md"/>
+
+    <!-- Tutorials: Learning-oriented -->
+    <toc-element toc-title="Tutorials">
+        <toc-element topic="tutorial-getting-started.md"/>
+    </toc-element>
+
+    <!-- How-to Guides: Task-oriented -->
+    <toc-element toc-title="How-to Guides">
+        <toc-element topic="howto-suspend-resume.md"/>
+        <toc-element topic="howto-run-programs.md"/>
+    </toc-element>
+
+    <!-- Reference: Information-oriented -->
+    <toc-element toc-title="Reference">
+        <toc-element topic="reference-cli.md"/>
+        <toc-element topic="reference-state-format.md"/>
+        <toc-element topic="reference-language-syntax.md"/>
+    </toc-element>
+
+    <!-- Explanation: Understanding-oriented -->
+    <toc-element toc-title="Explanation">
+        <toc-element topic="explanation-resumability.md"/>
+        <toc-element topic="explanation-truffle.md"/>
+    </toc-element>
+
+</instance-profile>

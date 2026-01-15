@@ -3,5 +3,6 @@ rootProject.name = 'ReLang'
 include 'relang-core'
 include 'relang-textmate'
 include 'relang-intellij'
+include 'relang-docs'
 
 // Note: relang-vscode is an npm project, not a Gradle module
