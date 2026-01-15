@@ -1,1 +1,3 @@
 rootProject.name = 'ReLang'
+
+include 'relang-core'

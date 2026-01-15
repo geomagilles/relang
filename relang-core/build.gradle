@@ -1,0 +1,35 @@
+plugins {
+    id 'application'
+    id 'antlr'
+    id 'com.google.protobuf'
+}
+
+dependencies {
+    antlr "org.antlr:antlr4:4.13.1"
+    implementation "org.antlr:antlr4-runtime:4.13.1"
+
+    implementation 'org.graalvm.truffle:truffle-api:24.0.0'
+    implementation 'org.graalvm.polyglot:polyglot:24.0.0'
+
+    // Annotation processor for Truffle DSL
+    annotationProcessor 'org.graalvm.truffle:truffle-dsl-processor:24.0.0'
+
+    // JSON serialization for ResumableState
+    implementation 'com.google.code.gson:gson:2.11.0'
+
+    // Protobuf serialization for ResumableState
+    implementation 'com.google.protobuf:protobuf-java:4.28.2'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:4.28.2'
+    }
+}
+
+application {
+    mainClass = 'com.relang.ReLangLauncher'
+}
