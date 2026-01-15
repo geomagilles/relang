@@ -1,8 +1,10 @@
 package com.relang;
 
-import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
 import com.oracle.truffle.api.frame.FrameDescriptor;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.RootNode;
+import com.relang.nodes.FrameState;
 import com.relang.nodes.ReLangNode;
 import com.relang.nodes.ReLangReturnException;
 import com.relang.nodes.ReLangSuspendException;
@@ -15,13 +17,17 @@ import java.util.Map;
 /**
  * The root node for a ReLang function.
  * Handles:
- * - REWINDING (resume): Restores local variables and passes frame state to children
- * - UNWINDING (suspend): Catches ReLangSuspendException, captures locals, re-throws
+ * <ul>
+ *   <li>REWINDING (resume): Restores local variables and passes frame state to children</li>
+ *   <li>UNWINDING (suspend): Catches ReLangSuspendException, captures locals, re-throws</li>
+ * </ul>
  */
 public class ReLangRootNode extends RootNode {
 
-    @Child
-    private ReLangNode bodyNode;
+    @Child private ReLangNode bodyNode;
+
+    /** Cached slot name to index mapping for O(1) lookup during restore. */
+    @CompilationFinal private Map<String, Integer> slotNameToIndex;
 
     public ReLangRootNode(ReLang language, FrameDescriptor frameDescriptor, ReLangNode bodyNode) {
         super(language, frameDescriptor);
@@ -32,7 +38,7 @@ public class ReLangRootNode extends RootNode {
     public Object execute(VirtualFrame frame) {
         ReLangContext context = ReLangContext.get(this);
         ResumableState globalState = context.getResumptionState();
-        ResumableState.FrameState myState = null;
+        FrameState myState = null;
 
         // REWINDING: Restore state if we are resuming
         if (globalState != null && !globalState.isEmpty()) {
@@ -42,16 +48,14 @@ public class ReLangRootNode extends RootNode {
         }
 
         try {
-            Object result = bodyNode.executeGeneric(frame);
-            return result;
+            return bodyNode.executeGeneric(frame);
         } catch (ReLangReturnException e) {
             return e.getResult();
         } catch (ReLangSuspendException e) {
             // UNWINDING: Capture this frame's state and re-throw
             Map<String, Object> locals = captureLocals(frame);
-            List<Integer> path = e.drainCurrentPath();  // Get path accumulated by BlockNodes
-            ResumableState.FrameState frameState = new ResumableState.FrameState(locals, path);
-            e.getState().pushFrame(frameState);
+            List<Integer> path = e.drainCurrentPath();
+            e.getState().pushFrame(new FrameState(locals, path));
             throw e;
         } finally {
             if (myState != null) {
@@ -60,15 +64,27 @@ public class ReLangRootNode extends RootNode {
         }
     }
 
-    private void restoreLocals(VirtualFrame frame, ResumableState.FrameState state) {
-        FrameDescriptor descriptor = getFrameDescriptor();
-        for (Map.Entry<String, Object> entry : state.getLocals().entrySet()) {
+    private Map<String, Integer> getSlotNameToIndex() {
+        if (slotNameToIndex == null) {
+            FrameDescriptor descriptor = getFrameDescriptor();
+            Map<String, Integer> mapping = new HashMap<>();
             for (int i = 0; i < descriptor.getNumberOfSlots(); i++) {
                 Object slotName = descriptor.getSlotName(i);
-                if (entry.getKey().equals(slotName)) {
-                    frame.setObject(i, entry.getValue());
-                    break;
+                if (slotName != null) {
+                    mapping.put(slotName.toString(), i);
                 }
+            }
+            slotNameToIndex = mapping;
+        }
+        return slotNameToIndex;
+    }
+
+    private void restoreLocals(VirtualFrame frame, FrameState state) {
+        Map<String, Integer> nameToIndex = getSlotNameToIndex();
+        for (var entry : state.getLocals().entrySet()) {
+            Integer slotIndex = nameToIndex.get(entry.getKey());
+            if (slotIndex != null) {
+                frame.setObject(slotIndex, entry.getValue());
             }
         }
     }
@@ -79,7 +95,10 @@ public class ReLangRootNode extends RootNode {
         for (int i = 0; i < descriptor.getNumberOfSlots(); i++) {
             Object val = frame.getValue(i);
             if (val != null) {
-                locals.put(descriptor.getSlotName(i).toString(), val);
+                Object slotName = descriptor.getSlotName(i);
+                if (slotName != null) {
+                    locals.put(slotName.toString(), val);
+                }
             }
         }
         return locals;

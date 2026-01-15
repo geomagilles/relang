@@ -115,20 +115,16 @@ public class ReLangTruffleParser {
     }
 
     private static ReLangNode parseStatement(ParseContext context, ReLangParser.StatementContext ctx) {
-        if (ctx instanceof ReLangParser.StatementExprContext) {
-            return parseExpr(context, ((ReLangParser.StatementExprContext) ctx).expr());
-        } else if (ctx instanceof ReLangParser.StatementAssignmentContext) {
-            return parseAssignment(context, ((ReLangParser.StatementAssignmentContext) ctx).assignment());
-        } else if (ctx instanceof ReLangParser.StatementIfContext) {
-            return parseIf(context, (ReLangParser.StatementIfContext) ctx);
-        } else if (ctx instanceof ReLangParser.StatementWhileContext) {
-            return parseWhile(context, (ReLangParser.StatementWhileContext) ctx);
-        } else if (ctx instanceof ReLangParser.StatementReturnContext) {
-            return new ReLangReturnNode(parseExpr(context, ((ReLangParser.StatementReturnContext) ctx).expr()));
-        } else if (ctx instanceof ReLangParser.StatementCheckpointContext) {
-            return new com.relang.nodes.ReLangCheckpointNode();
-        }
-        throw new RuntimeException("Unknown statement type: " + ctx.getClass().getSimpleName());
+        return switch (ctx) {
+            case ReLangParser.StatementExprContext s -> parseExpr(context, s.expr());
+            case ReLangParser.StatementAssignmentContext s -> parseAssignment(context, s.assignment());
+            case ReLangParser.StatementIfContext s -> parseIf(context, s);
+            case ReLangParser.StatementWhileContext s -> parseWhile(context, s);
+            case ReLangParser.StatementReturnContext s -> new ReLangReturnNode(parseExpr(context, s.expr()));
+            case ReLangParser.StatementCheckpointContext ignored -> new com.relang.nodes.ReLangCheckpointNode();
+            case null -> throw new IllegalArgumentException("Statement context cannot be null");
+            default -> throw new IllegalArgumentException("Unknown statement type: " + ctx.getClass().getSimpleName());
+        };
     }
 
     private static ReLangNode parseIf(ParseContext context, ReLangParser.StatementIfContext ctx) {
@@ -155,46 +151,40 @@ public class ReLangTruffleParser {
     }
 
     private static ReLangNode parseExpr(ParseContext context, ReLangParser.ExprContext ctx) {
-        if (ctx instanceof ReLangParser.ExprBinaryContext) {
-            ReLangParser.ExprBinaryContext bin = (ReLangParser.ExprBinaryContext) ctx;
-            ReLangNode left = parseExpr(context, bin.left);
-            ReLangNode right = parseExpr(context, bin.right);
+        return switch (ctx) {
+            case ReLangParser.ExprBinaryContext bin -> parseBinaryExpr(context, bin);
+            case ReLangParser.ExprIntContext intCtx -> new LongLiteralNode(Long.parseLong(intCtx.INT().getText()));
+            case ReLangParser.ExprDidContext paren -> parseExpr(context, paren.expr());
+            case ReLangParser.ExprIdContext id -> ReLangReadLocalVarNodeGen.create(context.getSlot(id.ID().getText()));
+            case ReLangParser.ExprCallContext call -> parseCallExpr(context, call);
+            case null -> throw new IllegalArgumentException("Expression context cannot be null");
+            default -> throw new IllegalArgumentException("Unknown expr type: " + ctx.getText());
+        };
+    }
 
-            String op = bin.op.getText();
-            if (op.equals("+")) {
-                return AddNodeGen.create(left, right);
-            } else if (op.equals("-")) {
-                return SubNodeGen.create(left, right);
-            } else if (op.equals("*")) {
-                return MulNodeGen.create(left, right);
-            } else if (op.equals("/")) {
-                return DivNodeGen.create(left, right);
-            } else if (op.equals("<")) {
-                return LessThanNodeGen.create(left, right);
-            } else if (op.equals("==")) {
-                return EqualsNodeGen.create(left, right);
+    private static ReLangNode parseBinaryExpr(ParseContext context, ReLangParser.ExprBinaryContext bin) {
+        ReLangNode left = parseExpr(context, bin.left);
+        ReLangNode right = parseExpr(context, bin.right);
+
+        return switch (bin.op.getText()) {
+            case "+" -> AddNodeGen.create(left, right);
+            case "-" -> SubNodeGen.create(left, right);
+            case "*" -> MulNodeGen.create(left, right);
+            case "/" -> DivNodeGen.create(left, right);
+            case "<" -> LessThanNodeGen.create(left, right);
+            case "==" -> EqualsNodeGen.create(left, right);
+            default -> throw new IllegalArgumentException("Unknown operator: " + bin.op.getText());
+        };
+    }
+
+    private static ReLangNode parseCallExpr(ParseContext context, ReLangParser.ExprCallContext call) {
+        String funcName = call.ID().getText();
+        List<ReLangNode> args = new ArrayList<>();
+        if (call.arguments() != null) {
+            for (ReLangParser.ExprContext argExpr : call.arguments().expr()) {
+                args.add(parseExpr(context, argExpr));
             }
-        } else if (ctx instanceof ReLangParser.ExprIntContext) {
-            long val = Long.parseLong(((ReLangParser.ExprIntContext) ctx).INT().getText());
-            return new LongLiteralNode(val);
-        } else if (ctx instanceof ReLangParser.ExprDidContext) {
-            return parseExpr(context, ((ReLangParser.ExprDidContext) ctx).expr());
-        } else if (ctx instanceof ReLangParser.ExprIdContext) {
-            String varName = ((ReLangParser.ExprIdContext) ctx).ID().getText();
-            int slot = context.getSlot(varName);
-            return ReLangReadLocalVarNodeGen.create(slot);
-        } else if (ctx instanceof ReLangParser.ExprCallContext) {
-            ReLangParser.ExprCallContext call = (ReLangParser.ExprCallContext) ctx;
-            String funcName = call.ID().getText();
-            List<ReLangNode> args = new ArrayList<>();
-            if (call.arguments() != null) {
-                for (ReLangParser.ExprContext argExpr : call.arguments().expr()) {
-                    args.add(parseExpr(context, argExpr));
-                }
-            }
-            return new ReLangInvokeNode(funcName, args.toArray(new ReLangNode[0]));
         }
-
-        throw new RuntimeException("Unknown expr type: " + ctx.getText());
+        return new ReLangInvokeNode(funcName, args.toArray(new ReLangNode[0]));
     }
 }

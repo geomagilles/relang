@@ -6,8 +6,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 @NodeInfo(shortName = "return", description = "The node implementing a return statement")
 public final class ReLangReturnNode extends ReLangNode {
 
-    @Child
-    private ReLangNode valueNode;
+    @Child private ReLangNode valueNode;
 
     public ReLangReturnNode(ReLangNode valueNode) {
         this.valueNode = valueNode;

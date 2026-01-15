@@ -4,11 +4,10 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.relang.nodes.ResumableState;
-import com.relang.nodes.StateCodeMismatchException;
 import com.relang.nodes.SuspendedResult;
-import com.relang.proto.ResumableStateProtos.ResumableStateProto;
 import com.relang.proto.ResumableStateProtos.FrameStateProto;
 import com.relang.proto.ResumableStateProtos.LocalValue;
+import com.relang.proto.ResumableStateProtos.ResumableStateProto;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
@@ -55,7 +54,7 @@ public class ReLangResumabilityTest {
 
         assertTrue(result1.isHostObject(), "Result should be a SuspendedResult");
         SuspendedResult suspended = result1.asHostObject();
-        assertNotNull(suspended.getState());
+        assertNotNull(suspended.state());
 
         // Resume by passing state back via polyglot bindings
         context.getPolyglotBindings().putMember("resumeState", suspended);
@@ -111,7 +110,7 @@ public class ReLangResumabilityTest {
         SuspendedResult suspended = result1.asHostObject();
 
         // Verify we have frames for both outer() and inner()
-        ResumableState state = suspended.getState();
+        ResumableState state = suspended.state();
         assertFalse(state.isEmpty(), "State should have captured frames");
 
         // Resume
@@ -194,7 +193,7 @@ public class ReLangResumabilityTest {
             oos.writeObject(original);
         }
         byte[] serialized = baos.toByteArray();
-        
+
         // Verify we got some bytes
         assertTrue(serialized.length > 0, "Serialized data should not be empty");
 
@@ -206,8 +205,8 @@ public class ReLangResumabilityTest {
 
         // Verify deserialized state
         assertNotNull(deserialized);
-        assertNotNull(deserialized.getState());
-        assertFalse(deserialized.getState().isEmpty());
+        assertNotNull(deserialized.state());
+        assertFalse(deserialized.state().isEmpty());
 
         // Resume with deserialized state
         context.getPolyglotBindings().putMember("resumeState", deserialized);
@@ -237,15 +236,15 @@ public class ReLangResumabilityTest {
         SuspendedResult original = result1.asHostObject();
 
         // Verify frame count (should have frames for: top-level, outer, inner)
-        assertTrue(original.getState().getFrameCount() >= 2, 
-            "Should have multiple frames for nested calls");
+        assertTrue(original.state().getFrameCount() >= 2,
+                "Should have multiple frames for nested calls");
 
         // Serialize and deserialize
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
             oos.writeObject(original);
         }
-        
+
         SuspendedResult deserialized;
         try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()))) {
             deserialized = (SuspendedResult) ois.readObject();
@@ -276,7 +275,7 @@ public class ReLangResumabilityTest {
         // Verify root structure
         assertTrue(root.has("frames"), "Root should have 'frames' array");
         JsonArray frames = root.getAsJsonArray("frames");
-        
+
         // Top-level code has 1 frame
         assertEquals(1, frames.size(), "Should have 1 frame for top-level code");
 
@@ -454,10 +453,10 @@ public class ReLangResumabilityTest {
         // Check execution path contains integers
         JsonObject frame = frames.get(0).getAsJsonObject();
         JsonArray path = frame.getAsJsonArray("executionPath");
-        
+
         for (int i = 0; i < path.size(); i++) {
-            assertTrue(path.get(i).getAsJsonPrimitive().isNumber(), 
-                "Path element " + i + " should be a number");
+            assertTrue(path.get(i).getAsJsonPrimitive().isNumber(),
+                    "Path element " + i + " should be a number");
         }
 
         // The path should point past the checkpoint (index 4 = after checkpoint at index 3)
@@ -483,11 +482,11 @@ public class ReLangResumabilityTest {
         SuspendedResult suspended = result1.asHostObject();
 
         String json = suspended.toJson();
-        
+
         // Verify pretty-printed format
         assertTrue(json.contains("\n"), "JSON should be pretty-printed with newlines");
         assertTrue(json.contains("  "), "JSON should have indentation");
-        
+
         // Should still be valid JSON
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         assertNotNull(root);
@@ -512,7 +511,7 @@ public class ReLangResumabilityTest {
 
         // Serialize to protobuf bytes
         byte[] protoBytes = original.toProtoBytes();
-        
+
         // Verify we got some bytes (should be compact)
         assertTrue(protoBytes.length > 0, "Protobuf bytes should not be empty");
         assertTrue(protoBytes.length < 200, "Protobuf should be compact");
@@ -522,7 +521,7 @@ public class ReLangResumabilityTest {
 
         // Verify state preserved
         assertNotNull(deserialized);
-        assertEquals(original.getState().getFrameCount(), deserialized.getState().getFrameCount());
+        assertEquals(original.state().getFrameCount(), deserialized.state().getFrameCount());
 
         // Resume with deserialized state
         context.getPolyglotBindings().putMember("resumeState", deserialized);
@@ -548,21 +547,21 @@ public class ReLangResumabilityTest {
 
         // Verify structure
         assertEquals(1, proto.getFramesCount(), "Should have 1 frame");
-        
+
         FrameStateProto frame = proto.getFrames(0);
-        
+
         // Check locals
         assertTrue(frame.containsLocals("x"), "Should have local 'x'");
         assertTrue(frame.containsLocals("flag"), "Should have local 'flag'");
-        
+
         LocalValue xValue = frame.getLocalsOrThrow("x");
         assertTrue(xValue.hasLongValue(), "x should be a long");
         assertEquals(42, xValue.getLongValue());
-        
+
         LocalValue flagValue = frame.getLocalsOrThrow("flag");
         assertTrue(flagValue.hasBoolValue(), "flag should be a boolean");
         assertTrue(flagValue.getBoolValue());
-        
+
         // Check execution path
         assertTrue(frame.getExecutionPathCount() > 0, "Should have execution path");
 
@@ -639,13 +638,13 @@ public class ReLangResumabilityTest {
         String json = suspended.toJson();
 
         // Protobuf should be significantly smaller
-        assertTrue(protoBytes.length < json.length(), 
-            "Protobuf (" + protoBytes.length + " bytes) should be smaller than JSON (" + json.length() + " bytes)");
-        
+        assertTrue(protoBytes.length < json.length(),
+                "Protobuf (" + protoBytes.length + " bytes) should be smaller than JSON (" + json.length() + " bytes)");
+
         // Typically 3-5x smaller
         double ratio = (double) json.length() / protoBytes.length;
-        assertTrue(ratio > 2.0, 
-            "JSON should be at least 2x larger than protobuf (actual ratio: " + ratio + ")");
+        assertTrue(ratio > 2.0,
+                "JSON should be at least 2x larger than protobuf (actual ratio: " + ratio + ")");
     }
 
     @Test
@@ -698,7 +697,7 @@ public class ReLangResumabilityTest {
         SuspendedResult suspended = result1.asHostObject();
 
         // Verify source hash is set
-        String sourceHash = suspended.getState().getSourceHash();
+        String sourceHash = suspended.state().getSourceHash();
         assertNotNull(sourceHash, "Source hash should be set");
         assertEquals(64, sourceHash.length(), "SHA-256 hash should be 64 hex characters");
     }
@@ -724,7 +723,7 @@ public class ReLangResumabilityTest {
 
         // Verify round-trip preserves hash
         SuspendedResult restored = SuspendedResult.fromJson(json);
-        assertEquals(jsonHash, restored.getState().getSourceHash());
+        assertEquals(jsonHash, restored.state().getSourceHash());
     }
 
     @Test
@@ -747,7 +746,7 @@ public class ReLangResumabilityTest {
 
         // Verify round-trip preserves hash
         SuspendedResult restored = SuspendedResult.fromProto(proto);
-        assertEquals(protoHash, restored.getState().getSourceHash());
+        assertEquals(protoHash, restored.state().getSourceHash());
     }
 
     @Test
@@ -761,7 +760,7 @@ public class ReLangResumabilityTest {
         // Run twice with same code
         Value result1 = context.eval("relang", src);
         SuspendedResult suspended1 = result1.asHostObject();
-        String hash1 = suspended1.getState().getSourceHash();
+        String hash1 = suspended1.state().getSourceHash();
 
         // Resume first, then run again
         context.getPolyglotBindings().putMember("resumeState", suspended1);
@@ -771,7 +770,7 @@ public class ReLangResumabilityTest {
         context.getPolyglotBindings().removeMember("resumeState");
         Value result2 = context.eval("relang", src);
         SuspendedResult suspended2 = result2.asHostObject();
-        String hash2 = suspended2.getState().getSourceHash();
+        String hash2 = suspended2.state().getSourceHash();
 
         assertEquals(hash1, hash2, "Same code should produce same hash");
     }
@@ -783,7 +782,7 @@ public class ReLangResumabilityTest {
                 checkpoint;
                 x;
                 """;
-        
+
         String src2 = """
                 x = 43;
                 checkpoint;
@@ -802,9 +801,9 @@ public class ReLangResumabilityTest {
         SuspendedResult suspended2 = result2.asHostObject();
 
         assertNotEquals(
-            suspended1.getState().getSourceHash(),
-            suspended2.getState().getSourceHash(),
-            "Different code should produce different hash"
+                suspended1.state().getSourceHash(),
+                suspended2.state().getSourceHash(),
+                "Different code should produce different hash"
         );
     }
 
@@ -832,13 +831,13 @@ public class ReLangResumabilityTest {
 
         // Truffle wraps exceptions in PolyglotException
         PolyglotException ex = assertThrows(
-            PolyglotException.class,
-            () -> context.eval("relang", srcModified),
-            "Resume with changed code should throw exception"
+                PolyglotException.class,
+                () -> context.eval("relang", srcModified),
+                "Resume with changed code should throw exception"
         );
         assertTrue(ex.getMessage().contains("StateCodeMismatchException")
-                || ex.getMessage().contains("Source code has changed"),
-            "Exception should indicate source code mismatch");
+                        || ex.getMessage().contains("Source code has changed"),
+                "Exception should indicate source code mismatch");
     }
 
     @Test
@@ -884,24 +883,24 @@ public class ReLangResumabilityTest {
         SuspendedResult fromJson = SuspendedResult.fromJson(json);
         context.getPolyglotBindings().putMember("resumeState", fromJson);
         PolyglotException jsonEx = assertThrows(
-            PolyglotException.class,
-            () -> context.eval("relang", srcModified),
-            "JSON-deserialized state should validate hash"
+                PolyglotException.class,
+                () -> context.eval("relang", srcModified),
+                "JSON-deserialized state should validate hash"
         );
         assertTrue(jsonEx.getMessage().contains("StateCodeMismatchException")
-                || jsonEx.getMessage().contains("Source code has changed"),
-            "JSON exception should indicate source code mismatch");
+                        || jsonEx.getMessage().contains("Source code has changed"),
+                "JSON exception should indicate source code mismatch");
 
         // Deserialize from Proto and try to resume with different code
         SuspendedResult fromProto = SuspendedResult.fromProtoBytes(protoBytes);
         context.getPolyglotBindings().putMember("resumeState", fromProto);
         PolyglotException protoEx = assertThrows(
-            PolyglotException.class,
-            () -> context.eval("relang", srcModified),
-            "Proto-deserialized state should validate hash"
+                PolyglotException.class,
+                () -> context.eval("relang", srcModified),
+                "Proto-deserialized state should validate hash"
         );
         assertTrue(protoEx.getMessage().contains("StateCodeMismatchException")
-                || protoEx.getMessage().contains("Source code has changed"),
-            "Proto exception should indicate source code mismatch");
+                        || protoEx.getMessage().contains("Source code has changed"),
+                "Proto exception should indicate source code mismatch");
     }
 }

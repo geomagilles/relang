@@ -4,6 +4,7 @@ import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.nodes.Node;
+import com.relang.nodes.FrameState;
 import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
 
@@ -16,25 +17,29 @@ import java.util.Map;
  */
 public final class ReLangContext {
 
+    private static final TruffleLanguage.ContextReference<ReLangContext> REF =
+            TruffleLanguage.ContextReference.create(ReLang.class);
     private final TruffleLanguage.Env env;
     private final Map<String, RootCallTarget> functionRegistry = new HashMap<>();
-
     // The frame state for the currently executing function during resume
-    private ResumableState.FrameState activeFrameState;
-    
+    private FrameState activeFrameState;
     // SHA-256 hash of the current source code, used for state validation
     private String currentSourceHash;
 
     public ReLangContext(ReLang language, TruffleLanguage.Env env) {
         this.env = env;
     }
-    
-    public void setCurrentSourceHash(String hash) {
-        this.currentSourceHash = hash;
+
+    public static ReLangContext get(Node node) {
+        return REF.get(node);
     }
-    
+
     public String getCurrentSourceHash() {
         return currentSourceHash;
+    }
+
+    public void setCurrentSourceHash(String hash) {
+        this.currentSourceHash = hash;
     }
 
     public TruffleLanguage.Env getEnv() {
@@ -59,7 +64,7 @@ public final class ReLangContext {
                 if (env.isHostObject(value)) {
                     Object hostObj = env.asHostObject(value);
                     if (hostObj instanceof SuspendedResult) {
-                        return ((SuspendedResult) hostObj).getState();
+                        return ((SuspendedResult) hostObj).state();
                     }
                 }
             }
@@ -71,18 +76,11 @@ public final class ReLangContext {
         return null;
     }
 
-    public void setActiveFrameState(ResumableState.FrameState state) {
-        this.activeFrameState = state;
-    }
-
-    public ResumableState.FrameState getActiveFrameState() {
+    public FrameState getActiveFrameState() {
         return activeFrameState;
     }
 
-    private static final TruffleLanguage.ContextReference<ReLangContext> REF = 
-            TruffleLanguage.ContextReference.create(ReLang.class);
-
-    public static ReLangContext get(Node node) {
-        return REF.get(node);
+    public void setActiveFrameState(FrameState state) {
+        this.activeFrameState = state;
     }
 }

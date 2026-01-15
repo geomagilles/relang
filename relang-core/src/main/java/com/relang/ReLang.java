@@ -26,7 +26,7 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
         String sourceHash = ResumableState.computeSourceHash(sourceCode);
         
         Map<String, RootCallTarget> functions = com.relang.parser.ReLangTruffleParser.parse(this, request.getSource());
-        ReLangContext context = getCurrentContext(ReLang.class);
+        ReLangContext context = ReLangContext.get(null);
         context.getFunctionRegistry().putAll(functions);
         context.setCurrentSourceHash(sourceHash);
         

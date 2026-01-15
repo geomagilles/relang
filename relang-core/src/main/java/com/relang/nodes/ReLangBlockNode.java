@@ -25,12 +25,12 @@ public final class ReLangBlockNode extends ReLangNode {
     @ExplodeLoop
     public Object executeGeneric(VirtualFrame frame) {
         if (bodyNodes.length == 0) {
-            return 0L;
+            return UNIT;
         }
 
         // Get frame state from context (set by RootNode during resume)
         ReLangContext context = ReLangContext.get(this);
-        ResumableState.FrameState frameState = context.getActiveFrameState();
+        FrameState frameState = context.getActiveFrameState();
 
         int startIndex = 0;
 
@@ -40,11 +40,11 @@ public final class ReLangBlockNode extends ReLangNode {
         }
 
         if (startIndex >= bodyNodes.length) {
-            return 0L;
+            return UNIT;
         }
 
         // Execute statements
-        Object result = 0L;
+        Object result = UNIT;
         for (int i = startIndex; i < bodyNodes.length; i++) {
             try {
                 result = bodyNodes[i].executeGeneric(frame);

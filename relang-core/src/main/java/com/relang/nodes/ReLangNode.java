@@ -13,6 +13,12 @@ import com.relang.ReLangTypeSystemGen;
 public abstract class ReLangNode extends Node {
 
     /**
+     * Unit value returned by statements that don't produce a meaningful result.
+     * Used by control flow nodes (if without else, while, empty blocks).
+     */
+    public static final long UNIT = 0L;
+
+    /**
      * The execute method that every node must implement.
      * Frame state for resumability is passed via ReLangContext.getActiveFrameState().
      */
@@ -20,5 +26,23 @@ public abstract class ReLangNode extends Node {
 
     public long executeLong(VirtualFrame frame) throws UnexpectedResultException {
         return ReLangTypeSystemGen.expectLong(executeGeneric(frame));
+    }
+
+    /**
+     * Evaluate a value as a boolean condition.
+     * Supports ReLang's C-style truthiness: booleans directly, longs where 0 is false.
+     *
+     * @param value the result of evaluating a condition expression
+     * @return the boolean interpretation
+     * @throws IllegalArgumentException if the value is not a valid condition type
+     */
+    protected static boolean evaluateAsBoolean(Object value) {
+        return switch (value) {
+            case Boolean b -> b;
+            case Long l -> l != 0;
+            case null -> throw new IllegalArgumentException("Condition cannot be null");
+            default -> throw new IllegalArgumentException(
+                    "Condition must be boolean or long, got: " + value.getClass().getSimpleName());
+        };
     }
 }
