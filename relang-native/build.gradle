@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+    alias(libs.plugins.graalvm.native)
+}
+
+dependencies {
+    implementation project(':relang-core')
+}
+
+graalvmNative {
+    binaries {
+        main {
+            imageName = 'relang'
+            mainClass = 'com.relang.ReLangLauncher'
+            buildArgs.addAll([
+                '--no-fallback',
+                '-H:+ReportExceptionStackTraces',
+                '-H:+UnlockExperimentalVMOptions',
+                '--initialize-at-build-time=com.relang',
+                '--initialize-at-build-time=org.antlr.v4.runtime',
+                '--initialize-at-build-time=com.google.gson',
+                '--initialize-at-build-time=com.google.protobuf'
+            ])
+        }
+    }
+    metadataRepository {
+        enabled = true
+    }
+}

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "com.relang.nodes.SuspendedResult",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.relang.nodes.ResumableState",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.relang.nodes.ResumableState$FrameState",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.relang.nodes.StateCodeMismatchException",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  }
+]

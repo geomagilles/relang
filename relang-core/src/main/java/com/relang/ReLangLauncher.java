@@ -1,5 +1,7 @@
 package com.relang;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.relang.nodes.SuspendedResult;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
@@ -7,14 +9,24 @@ import org.graalvm.polyglot.Value;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.io.BufferedReader;
 
 public class ReLangLauncher {
+
+    // Exit codes following sysexits.h conventions
+    public static final int EX_OK = 0;
+    public static final int EX_ERROR = 1;
+    public static final int EX_TEMPFAIL = 75;  // Suspended at checkpoint
 
     public static void main(String[] args) {
         boolean lspMode = false;
         boolean inspectMode = false;
         String filePath = null;
+        String stateIn = null;
+        String stateOut = null;
+        String stateFormat = "json";
         int lspPort = 8123;
         int inspectPort = 4711;
 
@@ -37,6 +49,26 @@ public class ReLangLauncher {
                         inspectPort = Integer.parseInt(args[++i]);
                     }
                     break;
+                case "--state-in":
+                    if (i + 1 < args.length) {
+                        stateIn = args[++i];
+                    }
+                    break;
+                case "--state-out":
+                    if (i + 1 < args.length) {
+                        stateOut = args[++i];
+                    }
+                    break;
+                case "--state-format":
+                    if (i + 1 < args.length) {
+                        stateFormat = args[++i];
+                        if (!stateFormat.equals("json") && !stateFormat.equals("protobuf")) {
+                            System.err.println("Invalid state format: " + stateFormat);
+                            System.err.println("Valid formats: json, protobuf");
+                            System.exit(EX_ERROR);
+                        }
+                    }
+                    break;
                 case "--help":
                 case "-h":
                     printHelp();
@@ -52,7 +84,8 @@ public class ReLangLauncher {
         if (lspMode) {
             startLspServer(lspPort);
         } else if (filePath != null) {
-            runFile(filePath, inspectMode, inspectPort);
+            int exitCode = runFile(filePath, inspectMode, inspectPort, stateIn, stateOut, stateFormat);
+            System.exit(exitCode);
         } else {
             runRepl();
         }
@@ -86,11 +119,23 @@ public class ReLangLauncher {
         }
     }
 
-    private static void runFile(String filePath, boolean inspect, int inspectPort) {
+    private static int runFile(String filePath, boolean inspect, int inspectPort,
+                                String stateIn, String stateOut, String stateFormat) {
         File file = new File(filePath);
         if (!file.exists()) {
             System.err.println("File not found: " + filePath);
-            System.exit(1);
+            return EX_ERROR;
+        }
+
+        // Load state if specified
+        SuspendedResult resumeState = null;
+        if (stateIn != null) {
+            try {
+                resumeState = loadState(stateIn, stateFormat);
+            } catch (Exception e) {
+                System.err.println("Error loading state: " + e.getMessage());
+                return EX_ERROR;
+            }
         }
 
         Context.Builder builder = Context.newBuilder("relang")
@@ -106,19 +151,73 @@ public class ReLangLauncher {
         }
 
         try (Context context = builder.build()) {
+            // Inject resume state if available
+            if (resumeState != null) {
+                context.getPolyglotBindings().putMember("resumeState", resumeState);
+            }
+
             Source source = Source.newBuilder("relang", file).build();
             Value result = context.eval(source);
+
+            // Check if execution was suspended
+            if (result != null && result.isHostObject()) {
+                Object hostObj = result.asHostObject();
+                if (hostObj instanceof SuspendedResult suspended) {
+                    // Save state if output file specified
+                    if (stateOut != null) {
+                        try {
+                            saveState(suspended, stateOut, stateFormat);
+                            System.out.println("State saved to: " + stateOut);
+                        } catch (Exception e) {
+                            System.err.println("Error saving state: " + e.getMessage());
+                            return EX_ERROR;
+                        }
+                    }
+                    return EX_TEMPFAIL;  // Suspended
+                }
+            }
 
             if (result != null && !result.isNull()) {
                 System.out.println("Result: " + result);
             }
+            return EX_OK;
+
         } catch (IOException e) {
             System.err.println("Error reading file: " + e.getMessage());
-            System.exit(1);
+            return EX_ERROR;
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
-            System.exit(1);
+            return EX_ERROR;
+        }
+    }
+
+    private static SuspendedResult loadState(String path, String format) throws IOException {
+        Path stateFile = Path.of(path);
+        if (!Files.exists(stateFile)) {
+            throw new IOException("State file not found: " + path);
+        }
+
+        if (format.equals("protobuf")) {
+            byte[] bytes = Files.readAllBytes(stateFile);
+            try {
+                return SuspendedResult.fromProtoBytes(bytes);
+            } catch (InvalidProtocolBufferException e) {
+                throw new IOException("Invalid protobuf state file: " + e.getMessage());
+            }
+        } else {
+            String json = Files.readString(stateFile);
+            return SuspendedResult.fromJson(json);
+        }
+    }
+
+    private static void saveState(SuspendedResult state, String path, String format) throws IOException {
+        Path stateFile = Path.of(path);
+
+        if (format.equals("protobuf")) {
+            Files.write(stateFile, state.toProtoBytes());
+        } else {
+            Files.writeString(stateFile, state.toJson());
         }
     }
 
@@ -165,16 +264,26 @@ public class ReLangLauncher {
         System.out.println("Usage: relang [options] [file.re]");
         System.out.println();
         System.out.println("Options:");
-        System.out.println("  --lsp              Start LSP server (for IDE integration)");
-        System.out.println("  --lsp.port <port>  LSP server port (default: 8123)");
-        System.out.println("  --inspect          Enable debugger");
-        System.out.println("  --inspect.port <p> Debugger port (default: 4711)");
-        System.out.println("  --help, -h         Show this help");
+        System.out.println("  --state-in <file>     Load execution state before running");
+        System.out.println("  --state-out <file>    Save state when checkpoint is hit");
+        System.out.println("  --state-format <fmt>  State format: json (default) | protobuf");
+        System.out.println("  --lsp                 Start LSP server (for IDE integration)");
+        System.out.println("  --lsp.port <port>     LSP server port (default: 8123)");
+        System.out.println("  --inspect             Enable debugger");
+        System.out.println("  --inspect.port <p>    Debugger port (default: 4711)");
+        System.out.println("  --help, -h            Show this help");
+        System.out.println();
+        System.out.println("Exit codes:");
+        System.out.println("  0   Program completed successfully");
+        System.out.println("  1   Runtime or parse error");
+        System.out.println("  75  Suspended at checkpoint (state saved)");
         System.out.println();
         System.out.println("Examples:");
-        System.out.println("  relang program.re          Run a file");
-        System.out.println("  relang --lsp               Start LSP server");
-        System.out.println("  relang --inspect prog.re   Run with debugger");
-        System.out.println("  relang                     Start REPL");
+        System.out.println("  relang program.re                          Run a file");
+        System.out.println("  relang program.re --state-out state.json   Run with checkpointing");
+        System.out.println("  relang program.re --state-in state.json    Resume from checkpoint");
+        System.out.println("  relang --lsp                               Start LSP server");
+        System.out.println("  relang --inspect prog.re                   Run with debugger");
+        System.out.println("  relang                                     Start REPL");
     }
 }

@@ -48,6 +48,89 @@ Parse arguments as: /refactor [scope]
 - Follow existing naming: `ReLang[Feature]Node`
 - Use `ReLangSuspendException` for checkpoint unwinding
 
+## Modern Java 25 Style
+
+When refactoring, use modern Java 25 features:
+
+### Pattern Matching
+```java
+// PREFER - pattern matching for instanceof
+if (result instanceof SuspendedResult suspended) {
+    return suspended.addFrameState(captureFrameState(frame));
+}
+
+// AVOID - old-style cast
+if (result instanceof SuspendedResult) {
+    SuspendedResult suspended = (SuspendedResult) result;
+    return suspended.addFrameState(captureFrameState(frame));
+}
+```
+
+### Switch Expressions
+```java
+// PREFER - switch expression
+var nodeType = switch (ctx) {
+    case AddContext _ -> NodeType.ADD;
+    case SubContext _ -> NodeType.SUB;
+    case MulContext _ -> NodeType.MUL;
+    default -> throw new IllegalArgumentException("Unknown context");
+};
+
+// AVOID - traditional switch statement
+NodeType nodeType;
+switch (ctx.getClass().getSimpleName()) {
+    case "AddContext": nodeType = NodeType.ADD; break;
+    // ...
+}
+```
+
+### Records for Data
+```java
+// PREFER - records for immutable data
+public record FrameState(Map<String, Object> locals, List<Integer> executionPath) {}
+
+// AVOID - verbose class with boilerplate
+public class FrameState {
+    private final Map<String, Object> locals;
+    private final List<Integer> executionPath;
+    // constructor, getters, equals, hashCode, toString...
+}
+```
+
+### Text Blocks
+```java
+// PREFER - text blocks for multi-line strings
+String help = """
+    Usage: relang [options] [file.re]
+
+    Options:
+      --state-in <file>   Load state
+      --state-out <file>  Save state
+    """;
+
+// AVOID - concatenation
+String help = "Usage: relang [options] [file.re]\n" +
+    "\n" +
+    "Options:\n" +
+    "  --state-in <file>   Load state\n";
+```
+
+### Local Variable Type Inference
+```java
+// PREFER - var when type is obvious
+var context = Context.newBuilder("relang").build();
+var frames = new ArrayList<FrameState>();
+
+// KEEP explicit types when helpful
+ReLangNode leftNode = parseExpression(ctx.left);  // Type clarifies intent
+```
+
+### Other Modern Features
+- Use `List.of()`, `Map.of()`, `Set.of()` for immutable collections
+- Use `Optional` instead of returning null
+- Use `Stream` API for collection transformations
+- Use `sealed` classes for restricted hierarchies
+
 ## Idiomatic Java for Truffle
 
 When refactoring, apply these Java idioms for GraalVM Truffle:

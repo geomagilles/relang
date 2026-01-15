@@ -1,6 +1,8 @@
 rootProject.name = 'ReLang'
 
 include 'relang-core'
+include 'relang-native'
+include 'relang-compiler'
 include 'relang-textmate'
 include 'relang-intellij'
 include 'relang-docs'

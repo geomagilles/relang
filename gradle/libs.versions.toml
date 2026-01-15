@@ -1,6 +1,7 @@
 [versions]
 antlr = "4.13.2"
 graalvm = "25.0.0"
+graalvm-native = "0.11.3"
 gson = "2.13.2"
 protobuf = "4.33.4"
 protobuf-plugin = "0.9.6"
@@ -26,3 +27,4 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvm-native" }

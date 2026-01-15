@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+    id 'application'
+    alias(libs.plugins.graalvm.native)
+}
+
+dependencies {
+    implementation project(':relang-core')
+    implementation libs.graalvm.polyglot
+    implementation libs.protobuf.java
+}
+
+application {
+    mainClass = 'com.relang.compiler.ReLangCompiler'
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'com.relang.compiler.ReLangCompiler'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+graalvmNative {
+    binaries {
+        main {
+            imageName = 'relangc'
+            mainClass = 'com.relang.compiler.ReLangCompiler'
+            buildArgs.addAll([
+                '--no-fallback',
+                '-H:+ReportExceptionStackTraces'
+            ])
+        }
+    }
+}

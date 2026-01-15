@@ -22,6 +22,7 @@
         <toc-element topic="reference-cli.md"/>
         <toc-element topic="reference-state-format.md"/>
         <toc-element topic="reference-language-syntax.md"/>
+        <toc-element topic="reference-native-builds.md"/>
     </toc-element>
 
     <!-- Explanation: Understanding-oriented -->
