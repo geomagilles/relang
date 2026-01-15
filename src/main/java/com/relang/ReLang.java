@@ -7,6 +7,7 @@ import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.RootNode;
 import com.relang.nodes.ReLangSuspendException;
+import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
 
 import java.util.Map;
@@ -21,9 +22,19 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
 
     @Override
     protected CallTarget parse(ParsingRequest request) throws Exception {
+        String sourceCode = request.getSource().getCharacters().toString();
+        String sourceHash = ResumableState.computeSourceHash(sourceCode);
+        
         Map<String, RootCallTarget> functions = com.relang.parser.ReLangTruffleParser.parse(this, request.getSource());
         ReLangContext context = getCurrentContext(ReLang.class);
         context.getFunctionRegistry().putAll(functions);
+        context.setCurrentSourceHash(sourceHash);
+        
+        // Verify source hash if resuming - fail fast if code changed
+        ResumableState resumeState = context.getResumptionState();
+        if (resumeState != null && resumeState.getSourceHash() != null) {
+            resumeState.verifySourceHash(sourceCode);
+        }
 
         // Get the entry point (main body or main function)
         RootCallTarget entryPoint;
@@ -54,6 +65,9 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
             try {
                 return entryPoint.call();
             } catch (ReLangSuspendException e) {
+                // Set the source hash on the state for validation on resume
+                e.getState().setSourceHash(context.getCurrentSourceHash());
+                
                 // Convert exception to SuspendedResult for the host
                 return context.getEnv().asGuestValue(new SuspendedResult(e.getState()));
             }

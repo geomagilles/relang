@@ -12,7 +12,7 @@ import java.util.Map;
 
 /**
  * Per-context state for ReLang execution.
- * Manages function registry and resumption state.
+ * Manages function registry, resumption state, and source code hash.
  */
 public final class ReLangContext {
 
@@ -21,9 +21,20 @@ public final class ReLangContext {
 
     // The frame state for the currently executing function during resume
     private ResumableState.FrameState activeFrameState;
+    
+    // SHA-256 hash of the current source code, used for state validation
+    private String currentSourceHash;
 
     public ReLangContext(ReLang language, TruffleLanguage.Env env) {
         this.env = env;
+    }
+    
+    public void setCurrentSourceHash(String hash) {
+        this.currentSourceHash = hash;
+    }
+    
+    public String getCurrentSourceHash() {
+        return currentSourceHash;
     }
 
     public TruffleLanguage.Env getEnv() {

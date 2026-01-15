@@ -13,8 +13,12 @@ import com.relang.proto.ResumableStateProtos.LocalValue;
 import com.relang.proto.ResumableStateProtos.ResumableStateProto;
 
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
@@ -23,6 +27,9 @@ import java.util.Stack;
  * Represents the suspended execution state that can be serialized and restored later.
  * Contains a stack of FrameState objects representing the call stack at suspension.
  * 
+ * Includes a source code hash to detect code changes between suspend and resume,
+ * preventing subtle bugs from mismatched execution paths.
+ * 
  * Supports multiple serialization formats:
  * - Java serialization (Serializable)
  * - JSON (toJson/fromJson)
@@ -30,12 +37,54 @@ import java.util.Stack;
  */
 public class ResumableState implements Serializable {
     
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;  // Bumped for sourceHash addition
     
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     
+    // SHA-256 hash of the source code at suspension time
+    private String sourceHash;
+    
     // Stack of frames stored as ArrayList (last element = top of stack)
     private final ArrayList<FrameState> frames = new ArrayList<>();
+    
+    /**
+     * Compute SHA-256 hash of source code.
+     */
+    public static String computeSourceHash(String sourceCode) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(sourceCode.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
+    }
+    
+    public void setSourceHash(String sourceHash) {
+        this.sourceHash = sourceHash;
+    }
+    
+    public String getSourceHash() {
+        return sourceHash;
+    }
+    
+    /**
+     * Verify that the given source code matches this state's hash.
+     * @throws StateCodeMismatchException if the code has changed
+     */
+    public void verifySourceHash(String currentSourceCode) {
+        if (sourceHash == null) {
+            return;  // No hash stored, skip verification
+        }
+        String currentHash = computeSourceHash(currentSourceCode);
+        if (!sourceHash.equals(currentHash)) {
+            throw new StateCodeMismatchException(
+                "Source code has changed since suspension. " +
+                "Stored hash: " + sourceHash.substring(0, 16) + "..., " +
+                "Current hash: " + currentHash.substring(0, 16) + "..."
+            );
+        }
+    }
 
     public void pushFrame(FrameState frame) {
         frames.add(frame);
@@ -68,13 +117,18 @@ public class ResumableState implements Serializable {
      */
     public String toJson() {
         JsonObject root = new JsonObject();
-        JsonArray framesArray = new JsonArray();
         
+        // Include source hash for validation on resume
+        if (sourceHash != null) {
+            root.addProperty("sourceHash", sourceHash);
+        }
+        
+        JsonArray framesArray = new JsonArray();
         for (FrameState frame : frames) {
             framesArray.add(frame.toJsonObject());
         }
-        
         root.add("frames", framesArray);
+        
         return GSON.toJson(root);
     }
     
@@ -83,9 +137,15 @@ public class ResumableState implements Serializable {
      */
     public static ResumableState fromJson(String json) {
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        JsonArray framesArray = root.getAsJsonArray("frames");
         
         ResumableState state = new ResumableState();
+        
+        // Restore source hash if present
+        if (root.has("sourceHash") && !root.get("sourceHash").isJsonNull()) {
+            state.setSourceHash(root.get("sourceHash").getAsString());
+        }
+        
+        JsonArray framesArray = root.getAsJsonArray("frames");
         for (JsonElement elem : framesArray) {
             state.pushFrame(FrameState.fromJsonObject(elem.getAsJsonObject()));
         }
@@ -98,6 +158,11 @@ public class ResumableState implements Serializable {
      */
     public ResumableStateProto toProto() {
         ResumableStateProto.Builder builder = ResumableStateProto.newBuilder();
+        
+        // Include source hash for validation on resume
+        if (sourceHash != null) {
+            builder.setSourceHash(sourceHash);
+        }
         
         for (FrameState frame : frames) {
             builder.addFrames(frame.toProto());
@@ -118,6 +183,11 @@ public class ResumableState implements Serializable {
      */
     public static ResumableState fromProto(ResumableStateProto proto) {
         ResumableState state = new ResumableState();
+        
+        // Restore source hash if present
+        if (proto.hasSourceHash()) {
+            state.setSourceHash(proto.getSourceHash());
+        }
         
         for (FrameStateProto frameProto : proto.getFramesList()) {
             state.pushFrame(FrameState.fromProto(frameProto));

@@ -24,6 +24,10 @@ message FrameStateProto {
 
 // The complete resumable state (call stack)
 message ResumableStateProto {
+  // SHA-256 hash of the source code at suspension time
+  // Used to detect code changes and fail fast on resume
+  optional string source_hash = 1;
+
   // Stack of frames (first = bottom, last = top)
-  repeated FrameStateProto frames = 1;
+  repeated FrameStateProto frames = 2;
 }

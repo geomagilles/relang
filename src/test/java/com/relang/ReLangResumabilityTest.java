@@ -4,12 +4,14 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.relang.nodes.ResumableState;
+import com.relang.nodes.StateCodeMismatchException;
 import com.relang.nodes.SuspendedResult;
 import com.relang.proto.ResumableStateProtos.ResumableStateProto;
 import com.relang.proto.ResumableStateProtos.FrameStateProto;
 import com.relang.proto.ResumableStateProtos.LocalValue;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -291,7 +293,7 @@ public class ReLangResumabilityTest {
         // Verify execution path
         JsonArray path = frame.getAsJsonArray("executionPath");
         assertNotNull(path, "executionPath should be an array");
-        assertTrue(path.size() > 0, "executionPath should not be empty");
+        assertFalse(path.isEmpty(), "executionPath should not be empty");
 
         // Verify round-trip works
         SuspendedResult deserialized = SuspendedResult.fromJson(json);
@@ -680,5 +682,226 @@ public class ReLangResumabilityTest {
         assertEquals(246, jsonResult);
         assertEquals(246, protoResult);
         assertEquals(jsonResult, protoResult, "JSON and Protobuf should produce identical results");
+    }
+
+    // ==================== Source Hash Validation Tests ====================
+
+    @Test
+    void testSourceHashIncludedInState() {
+        String src = """
+                x = 42;
+                checkpoint;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Verify source hash is set
+        String sourceHash = suspended.getState().getSourceHash();
+        assertNotNull(sourceHash, "Source hash should be set");
+        assertEquals(64, sourceHash.length(), "SHA-256 hash should be 64 hex characters");
+    }
+
+    @Test
+    void testSourceHashInJson() {
+        String src = """
+                x = 42;
+                checkpoint;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        String json = suspended.toJson();
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+
+        // Verify JSON contains sourceHash
+        assertTrue(root.has("sourceHash"), "JSON should contain sourceHash");
+        String jsonHash = root.get("sourceHash").getAsString();
+        assertEquals(64, jsonHash.length(), "SHA-256 hash should be 64 hex characters");
+
+        // Verify round-trip preserves hash
+        SuspendedResult restored = SuspendedResult.fromJson(json);
+        assertEquals(jsonHash, restored.getState().getSourceHash());
+    }
+
+    @Test
+    void testSourceHashInProto() throws Exception {
+        String src = """
+                x = 42;
+                checkpoint;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        ResumableStateProto proto = suspended.toProto();
+
+        // Verify proto contains sourceHash
+        assertTrue(proto.hasSourceHash(), "Proto should contain sourceHash");
+        String protoHash = proto.getSourceHash();
+        assertEquals(64, protoHash.length(), "SHA-256 hash should be 64 hex characters");
+
+        // Verify round-trip preserves hash
+        SuspendedResult restored = SuspendedResult.fromProto(proto);
+        assertEquals(protoHash, restored.getState().getSourceHash());
+    }
+
+    @Test
+    void testSameCodeProducesSameHash() {
+        String src = """
+                x = 42;
+                checkpoint;
+                x;
+                """;
+
+        // Run twice with same code
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended1 = result1.asHostObject();
+        String hash1 = suspended1.getState().getSourceHash();
+
+        // Resume first, then run again
+        context.getPolyglotBindings().putMember("resumeState", suspended1);
+        context.eval("relang", src);
+
+        // Clear and run fresh
+        context.getPolyglotBindings().removeMember("resumeState");
+        Value result2 = context.eval("relang", src);
+        SuspendedResult suspended2 = result2.asHostObject();
+        String hash2 = suspended2.getState().getSourceHash();
+
+        assertEquals(hash1, hash2, "Same code should produce same hash");
+    }
+
+    @Test
+    void testDifferentCodeProducesDifferentHash() {
+        String src1 = """
+                x = 42;
+                checkpoint;
+                x;
+                """;
+        
+        String src2 = """
+                x = 43;
+                checkpoint;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src1);
+        SuspendedResult suspended1 = result1.asHostObject();
+
+        // Resume to clear state
+        context.getPolyglotBindings().putMember("resumeState", suspended1);
+        context.eval("relang", src1);
+        context.getPolyglotBindings().removeMember("resumeState");
+
+        Value result2 = context.eval("relang", src2);
+        SuspendedResult suspended2 = result2.asHostObject();
+
+        assertNotEquals(
+            suspended1.getState().getSourceHash(),
+            suspended2.getState().getSourceHash(),
+            "Different code should produce different hash"
+        );
+    }
+
+    @Test
+    void testResumeWithChangedCodeFails() {
+        String srcOriginal = """
+                x = 42;
+                checkpoint;
+                x + 10;
+                """;
+
+        String srcModified = """
+                x = 42;
+                y = 1;
+                checkpoint;
+                x + 10;
+                """;
+
+        // Suspend with original code
+        Value result1 = context.eval("relang", srcOriginal);
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Try to resume with modified code - should fail
+        context.getPolyglotBindings().putMember("resumeState", suspended);
+
+        // Truffle wraps exceptions in PolyglotException
+        PolyglotException ex = assertThrows(
+            PolyglotException.class,
+            () -> context.eval("relang", srcModified),
+            "Resume with changed code should throw exception"
+        );
+        assertTrue(ex.getMessage().contains("StateCodeMismatchException")
+                || ex.getMessage().contains("Source code has changed"),
+            "Exception should indicate source code mismatch");
+    }
+
+    @Test
+    void testResumeWithSameCodeSucceeds() {
+        String src = """
+                x = 42;
+                checkpoint;
+                x + 10;
+                """;
+
+        // Suspend
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Resume with same code - should succeed
+        context.getPolyglotBindings().putMember("resumeState", suspended);
+        Value result2 = context.eval("relang", src);
+
+        assertEquals(52, result2.asLong());
+    }
+
+    @Test
+    void testHashValidationWorksAcrossSerializationFormats() throws Exception {
+        String srcOriginal = """
+                x = 42;
+                checkpoint;
+                x;
+                """;
+
+        String srcModified = """
+                x = 99;
+                checkpoint;
+                x;
+                """;
+
+        // Suspend and serialize to JSON
+        Value result1 = context.eval("relang", srcOriginal);
+        SuspendedResult original = result1.asHostObject();
+        String json = original.toJson();
+        byte[] protoBytes = original.toProtoBytes();
+
+        // Deserialize from JSON and try to resume with different code
+        SuspendedResult fromJson = SuspendedResult.fromJson(json);
+        context.getPolyglotBindings().putMember("resumeState", fromJson);
+        PolyglotException jsonEx = assertThrows(
+            PolyglotException.class,
+            () -> context.eval("relang", srcModified),
+            "JSON-deserialized state should validate hash"
+        );
+        assertTrue(jsonEx.getMessage().contains("StateCodeMismatchException")
+                || jsonEx.getMessage().contains("Source code has changed"),
+            "JSON exception should indicate source code mismatch");
+
+        // Deserialize from Proto and try to resume with different code
+        SuspendedResult fromProto = SuspendedResult.fromProtoBytes(protoBytes);
+        context.getPolyglotBindings().putMember("resumeState", fromProto);
+        PolyglotException protoEx = assertThrows(
+            PolyglotException.class,
+            () -> context.eval("relang", srcModified),
+            "Proto-deserialized state should validate hash"
+        );
+        assertTrue(protoEx.getMessage().contains("StateCodeMismatchException")
+                || protoEx.getMessage().contains("Source code has changed"),
+            "Proto exception should indicate source code mismatch");
     }
 }
