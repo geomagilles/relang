@@ -13,6 +13,8 @@ antlr-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr" }
 graalvm-truffle-api = { module = "org.graalvm.truffle:truffle-api", version.ref = "graalvm" }
 graalvm-truffle-dsl-processor = { module = "org.graalvm.truffle:truffle-dsl-processor", version.ref = "graalvm" }
 graalvm-polyglot = { module = "org.graalvm.polyglot:polyglot", version.ref = "graalvm" }
+graalvm-tools-lsp = { module = "org.graalvm.tools:lsp-tool", version.ref = "graalvm" }
+graalvm-tools-dap = { module = "org.graalvm.tools:dap-tool", version.ref = "graalvm" }
 
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 

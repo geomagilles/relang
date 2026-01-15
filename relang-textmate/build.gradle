@@ -1,0 +1,30 @@
+import groovy.json.JsonSlurper
+
+// This module contains shared TextMate grammar and language configuration
+// for ReLang IDE extensions (VS Code and IntelliJ)
+
+// No Java compilation needed - this is a resource-only module
+plugins {
+    id 'base'
+}
+
+// Task to validate the TextMate grammar JSON
+tasks.register('validateGrammar') {
+    description = 'Validates the TextMate grammar JSON syntax'
+    group = 'verification'
+
+    doLast {
+        def grammarFile = file('syntaxes/relang.tmLanguage.json')
+        def jsonSlurper = new JsonSlurper()
+        try {
+            jsonSlurper.parse(grammarFile)
+            println "TextMate grammar is valid JSON"
+        } catch (Exception e) {
+            throw new GradleException("Invalid TextMate grammar: ${e.message}")
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn 'validateGrammar'
+}

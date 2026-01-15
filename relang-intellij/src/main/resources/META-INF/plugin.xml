@@ -1,0 +1,29 @@
+<idea-plugin>
+    <id>com.relang.intellij</id>
+    <name>ReLang</name>
+    <vendor>ReLang</vendor>
+
+    <description><![CDATA[
+    Language support for ReLang, a resumable programming language built on GraalVM Truffle.
+
+    <h3>Features</h3>
+    <ul>
+        <li>Syntax highlighting for .re files (via TextMate grammar)</li>
+        <li>File type recognition</li>
+    </ul>
+
+    <h3>Optional: LSP Support</h3>
+    <p>For code completion and go-to-definition, install the LSP4IJ plugin and configure
+    it to connect to localhost:8123. Then run your ReLang program with
+    <code>--experimental-options --lsp</code>.</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.textmate</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- TextMate grammar for syntax highlighting and file type -->
+        <textmate.bundleProvider
+            implementation="com.relang.intellij.ReLangTextMateBundleProvider"/>
+    </extensions>
+</idea-plugin>

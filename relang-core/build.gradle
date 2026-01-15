@@ -11,6 +11,10 @@ dependencies {
     implementation libs.graalvm.truffle.api
     implementation libs.graalvm.polyglot
 
+    // GraalVM tools for LSP and debugging
+    runtimeOnly libs.graalvm.tools.lsp
+    runtimeOnly libs.graalvm.tools.dap
+
     // Annotation processor for Truffle DSL
     annotationProcessor libs.graalvm.truffle.dsl.processor
 

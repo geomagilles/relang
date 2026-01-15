@@ -1,0 +1,62 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '2.3.0'
+    id 'org.jetbrains.intellij.platform' version '2.2.1'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+repositories {
+    mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
+}
+
+dependencies {
+    intellijPlatform {
+        intellijIdeaCommunity("2024.3.2")
+        bundledPlugin("org.jetbrains.plugins.textmate")
+
+        pluginVerifier()
+        zipSigner()
+        instrumentationTools()
+    }
+
+    implementation(project(':relang-textmate'))
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+intellijPlatform {
+    pluginConfiguration {
+        id = 'com.relang.intellij'
+        name = 'ReLang'
+        version = project.version
+        description = 'Language support for ReLang - a resumable programming language'
+        vendor {
+            name = 'ReLang'
+        }
+        ideaVersion {
+            sinceBuild = "243"
+            untilBuild = provider { null }
+        }
+    }
+}
+
+// Copy TextMate bundle from relang-textmate module
+// Bundle structure: package.json at root, grammar in syntaxes subfolder
+tasks.register('copyTextMateBundle', Copy) {
+    from(project(':relang-textmate').file('syntaxes')) {
+        into('syntaxes')
+    }
+    from(project(':relang-textmate').file('package.json'))
+    from(project(':relang-textmate').file('language-configuration.json'))
+    into(layout.buildDirectory.dir('resources/main'))
+}
+
+tasks.named('processResources') {
+    dependsOn 'copyTextMateBundle'
+}

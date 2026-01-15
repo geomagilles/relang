@@ -5,3 +5,9 @@ out/
 *.iml
 .DS_Store
 .vscode/
+.intellijPlatform/
+
+# VS Code extension
+relang-vscode/node_modules/
+relang-vscode/out/
+relang-vscode/*.vsix

@@ -1,0 +1,22 @@
+{
+  "name": "relang",
+  "displayName": "ReLang",
+  "description": "ReLang language support",
+  "version": "0.1.0",
+  "contributes": {
+    "languages": [
+      {
+        "id": "relang",
+        "aliases": ["ReLang"],
+        "extensions": [".re"]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "relang",
+        "scopeName": "source.relang",
+        "path": "./syntaxes/relang.tmLanguage.json"
+      }
+    ]
+  }
+}
