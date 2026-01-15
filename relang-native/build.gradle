@@ -34,6 +34,8 @@ graalvmNative {
                 '--initialize-at-build-time=com.google.gson',
                 '--initialize-at-build-time=com.google.protobuf'
             ])
+            // Enable native access for Truffle FFM API calls during build
+            buildArgs.add('-J--enable-native-access=ALL-UNNAMED')
         }
     }
     metadataRepository {
