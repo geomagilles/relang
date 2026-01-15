@@ -1,0 +1,26 @@
+[versions]
+antlr = "4.13.2"
+graalvm = "25.0.0"
+gson = "2.13.2"
+protobuf = "4.33.4"
+protobuf-plugin = "0.9.6"
+junit = "5.14.2"
+
+[libraries]
+antlr = { module = "org.antlr:antlr4", version.ref = "antlr" }
+antlr-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr" }
+
+graalvm-truffle-api = { module = "org.graalvm.truffle:truffle-api", version.ref = "graalvm" }
+graalvm-truffle-dsl-processor = { module = "org.graalvm.truffle:truffle-dsl-processor", version.ref = "graalvm" }
+graalvm-polyglot = { module = "org.graalvm.polyglot:polyglot", version.ref = "graalvm" }
+
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
+
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }

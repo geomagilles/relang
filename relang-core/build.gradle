@@ -1,32 +1,32 @@
 plugins {
     id 'application'
     id 'antlr'
-    id 'com.google.protobuf'
+    alias(libs.plugins.protobuf)
 }
 
 dependencies {
-    antlr "org.antlr:antlr4:4.13.2"
-    implementation "org.antlr:antlr4-runtime:4.13.2"
+    antlr libs.antlr
+    implementation libs.antlr.runtime
 
-    implementation 'org.graalvm.truffle:truffle-api:25.0.0'
-    implementation 'org.graalvm.polyglot:polyglot:25.0.0'
+    implementation libs.graalvm.truffle.api
+    implementation libs.graalvm.polyglot
 
     // Annotation processor for Truffle DSL
-    annotationProcessor 'org.graalvm.truffle:truffle-dsl-processor:25.0.0'
+    annotationProcessor libs.graalvm.truffle.dsl.processor
 
     // JSON serialization for ResumableState
-    implementation 'com.google.code.gson:gson:2.13.2'
+    implementation libs.gson
 
     // Protobuf serialization for ResumableState
-    implementation 'com.google.protobuf:protobuf-java:4.33.4'
+    implementation libs.protobuf.java
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.14.2'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
 }
 
 protobuf {
     protoc {
-        artifact = 'com.google.protobuf:protoc:4.33.4'
+        artifact = libs.protobuf.protoc.get().toString()
     }
 }
 
