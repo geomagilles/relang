@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Language
+
+Always work and write in English, regardless of what language the user communicates in.
+
 ## Java Style
 
 Write idiomatic Java 25 code. Use modern features:

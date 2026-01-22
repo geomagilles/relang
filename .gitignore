@@ -6,6 +6,7 @@ out/
 .DS_Store
 .vscode/
 .intellijPlatform/
+tmp/
 
 # VS Code extension
 relang-vscode/node_modules/

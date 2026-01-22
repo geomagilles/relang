@@ -9,6 +9,10 @@
     <!-- Tutorials: Learning-oriented -->
     <toc-element toc-title="Tutorials">
         <toc-element topic="tutorial-getting-started.md"/>
+        <toc-element topic="tutorial-awaitables.md"/>
+        <toc-element topic="tutorial-coordination.md"/>
+        <toc-element topic="tutorial-failures.md"/>
+        <toc-element topic="tutorial-execution-control.md"/>
     </toc-element>
 
     <!-- How-to Guides: Task-oriented -->
