@@ -52,9 +52,9 @@ public class NonePrimitiveTest {
         }
 
         @Test
-        @DisplayName("none assigned to variable")
+        @DisplayName("none assigned to variable via let")
         void testNoneAssigned() {
-            Value result = context.eval("relang", "x = none; x;");
+            Value result = context.eval("relang", "let x = none; x;");
             assertTrue(result.isNull());
         }
     }
@@ -97,7 +97,7 @@ public class NonePrimitiveTest {
         @DisplayName("match distinguishes none from values")
         void testMatchDistinguish() {
             var src = """
-                fn describe(x) {
+                fn describe(x: Int?): String {
                     match x {
                         none -> "none",
                         0 -> "zero",
@@ -185,7 +185,7 @@ public class NonePrimitiveTest {
         @DisplayName("none passed as function argument")
         void testNoneAsArg() {
             var src = """
-                fn isNone(x) {
+                fn isNone(x: Int?): Bool {
                     match x {
                         none -> true,
                         _ -> false
@@ -200,7 +200,7 @@ public class NonePrimitiveTest {
         @DisplayName("non-none passed as function argument")
         void testNonNoneAsArg() {
             var src = """
-                fn isNone(x) {
+                fn isNone(x: Int?): Bool {
                     match x {
                         none -> true,
                         _ -> false

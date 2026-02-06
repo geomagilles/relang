@@ -132,9 +132,9 @@ public class FunctionDeclarationTest {
         }
 
         @Test
-        @DisplayName("expression body without any annotations")
-        void testExprBodyNoAnnotations() {
-            assertEval("fn double(x) = x * 2; double(5);", 10);
+        @DisplayName("expression body with param type, inferred return")
+        void testExprBodyParamTyped() {
+            assertEval("fn double(x: Int) = x * 2; double(5);", 10);
         }
 
         @Test

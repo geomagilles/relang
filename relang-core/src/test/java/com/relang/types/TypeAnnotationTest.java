@@ -155,28 +155,22 @@ public class TypeAnnotationTest {
         }
     }
 
-    // --- Without type annotations ---
+    // --- Inferred return types ---
 
     @Nested
-    @DisplayName("Without annotations")
-    class WithoutAnnotations {
+    @DisplayName("Inferred return types")
+    class InferredReturnTypes {
 
         @Test
-        @DisplayName("function without any type annotations")
-        void testNoAnnotations() {
-            assertEval("fn add(a, b) { return a + b; } add(3, 4);", 7);
+        @DisplayName("expression body with inferred return type")
+        void testExprBodyInferred() {
+            assertEval("fn square(x: Int) = x * x; square(6);", 36);
         }
 
         @Test
-        @DisplayName("expression body without annotations")
-        void testExprBodyNoAnnotations() {
-            assertEval("fn square(x) = x * x; square(6);", 36);
-        }
-
-        @Test
-        @DisplayName("partial annotations (some params typed)")
-        void testPartialAnnotations() {
-            assertEval("fn add(a: Int, b) { return a + b; } add(3, 4);", 7);
+        @DisplayName("block body with inferred return type")
+        void testBlockBodyInferred() {
+            assertEval("fn add(a: Int, b: Int) { a + b } add(3, 4);", 7);
         }
     }
 

@@ -2,21 +2,32 @@ package com.relang.parser;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Static type checker for ReLang, implemented as an ANTLR visitor.
  * <p>
- * Three-pass approach:
+ * Like Kotlin, every expression must have a concrete type. Untyped code is rejected:
+ * <ul>
+ *   <li>All function parameters must have type annotations</li>
+ *   <li>Return types may be omitted for non-recursive functions (inferred from body)</li>
+ *   <li>Recursive functions without explicit return types are rejected</li>
+ *   <li>Variables must be declared with {@code let} before use</li>
+ * </ul>
+ * <p>
+ * Four-pass approach:
  * <ol>
- *   <li>Register builtins + collect all function signatures</li>
- *   <li>Check all function bodies</li>
+ *   <li>Register builtins + collect all function signatures (return types may be null if omitted)</li>
+ *   <li>Infer return types for functions without explicit annotation</li>
+ *   <li>Check all function bodies (with all return types now known)</li>
  *   <li>Check top-level commands</li>
  * </ol>
  * <p>
- * When ANY operand is UnknownType, the operation silently succeeds and returns
- * UnknownType. This ensures existing untyped code continues to work.
+ * UnknownType is used ONLY for error recovery: when an error has already been reported,
+ * UnknownType prevents cascading errors. Valid code never produces UnknownType.
  */
 public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
@@ -25,6 +36,11 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     private Scope currentScope = new Scope(null);
     private ReLangType currentFunctionReturnType = null;
     private boolean insideLoop = false;
+
+    /** Tracks which functions are currently being inferred, to detect recursion. */
+    private final Set<String> inferring = new HashSet<>();
+    /** During return type inference, tracks the type seen in explicit return statements. */
+    private ReLangType inferredReturnFromStatements = null;
 
     // ---- Inner classes ----
 
@@ -66,7 +82,12 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             List<ParamSignature> params,
             int requiredCount,
             ReLangType returnType
-    ) {}
+    ) {
+        /** Return a new signature with the given return type. */
+        FunctionSignature withReturnType(ReLangType rt) {
+            return new FunctionSignature(name, params, requiredCount, rt);
+        }
+    }
 
     record ParamSignature(String name, ReLangType type) {}
 
@@ -81,6 +102,11 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         registerBuiltins();
         for (var func : tree.function()) {
             collectFunctionSignature(func);
+        }
+
+        // Pass 1.5: infer return types for functions without explicit annotation
+        for (var func : tree.function()) {
+            inferReturnTypeIfNeeded(func);
         }
 
         // Pass 2: check function bodies
@@ -122,35 +148,38 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         switch (func) {
             case ReLangParser.FunctionBlockContext fb -> {
                 var name = fb.ID().getText();
-                var params = collectParams(fb.typedParameters());
+                var params = collectParams(fb.typedParameters(), fb);
                 int requiredCount = countRequired(fb.typedParameters());
                 var returnType = fb.typeRef() != null
                         ? ReLangType.fromTypeRef(fb.typeRef())
-                        : ReLangType.UnknownType.INSTANCE;
+                        : null; // null = needs inference
                 functionSignatures.put(name, new FunctionSignature(name, params, requiredCount, returnType));
             }
             case ReLangParser.FunctionExprContext fe -> {
                 var name = fe.ID().getText();
-                var params = collectParams(fe.typedParameters());
+                var params = collectParams(fe.typedParameters(), fe);
                 int requiredCount = countRequired(fe.typedParameters());
                 var returnType = fe.typeRef() != null
                         ? ReLangType.fromTypeRef(fe.typeRef())
-                        : ReLangType.UnknownType.INSTANCE;
+                        : null; // null = needs inference
                 functionSignatures.put(name, new FunctionSignature(name, params, requiredCount, returnType));
             }
             default -> {}
         }
     }
 
-    private List<ParamSignature> collectParams(ReLangParser.TypedParametersContext ctx) {
+    private List<ParamSignature> collectParams(ReLangParser.TypedParametersContext ctx,
+                                                org.antlr.v4.runtime.ParserRuleContext funcCtx) {
         if (ctx == null) return List.of();
         var result = new ArrayList<ParamSignature>();
         for (var p : ctx.typedParam()) {
             var name = p.ID().getText();
-            var type = p.typeRef() != null
-                    ? ReLangType.fromTypeRef(p.typeRef())
-                    : ReLangType.UnknownType.INSTANCE;
-            result.add(new ParamSignature(name, type));
+            if (p.typeRef() == null) {
+                addError(p, "Parameter '" + name + "' must have a type annotation");
+                result.add(new ParamSignature(name, ReLangType.UnknownType.INSTANCE));
+            } else {
+                result.add(new ParamSignature(name, ReLangType.fromTypeRef(p.typeRef())));
+            }
         }
         return result;
     }
@@ -163,6 +192,68 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             else break; // once we see a default, all subsequent have defaults
         }
         return count;
+    }
+
+    // ---- Pass 1.5: Return type inference ----
+
+    private void inferReturnTypeIfNeeded(ReLangParser.FunctionContext func) {
+        switch (func) {
+            case ReLangParser.FunctionBlockContext fb -> {
+                var name = fb.ID().getText();
+                var sig = functionSignatures.get(name);
+                if (sig.returnType() == null) {
+                    inferReturnType(name, sig, fb.block(), null);
+                }
+            }
+            case ReLangParser.FunctionExprContext fe -> {
+                var name = fe.ID().getText();
+                var sig = functionSignatures.get(name);
+                if (sig.returnType() == null) {
+                    inferReturnType(name, sig, null, fe.expr());
+                }
+            }
+            default -> {}
+        }
+    }
+
+    private void inferReturnType(String name, FunctionSignature sig,
+                                  ReLangParser.BlockContext blockCtx,
+                                  ReLangParser.ExprContext exprCtx) {
+        // Mark as currently inferring to detect recursion
+        inferring.add(name);
+
+        // Set up function scope with param types
+        var funcScope = new Scope(null);
+        for (var p : sig.params()) {
+            funcScope.define(p.name(), p.type());
+        }
+        var savedScope = currentScope;
+        var savedReturn = currentFunctionReturnType;
+        var savedInferred = inferredReturnFromStatements;
+        currentScope = funcScope;
+        // During inference, we don't know the return type yet
+        currentFunctionReturnType = null;
+        inferredReturnFromStatements = null;
+
+        ReLangType bodyType;
+        if (exprCtx != null) {
+            bodyType = visit(exprCtx);
+        } else {
+            bodyType = visitBlock(blockCtx);
+        }
+
+        // If body type is Unit but we saw explicit return statements, use the return type
+        if (bodyType instanceof ReLangType.UnitType && inferredReturnFromStatements != null) {
+            bodyType = inferredReturnFromStatements;
+        }
+
+        currentScope = savedScope;
+        currentFunctionReturnType = savedReturn;
+        inferredReturnFromStatements = savedInferred;
+        inferring.remove(name);
+
+        // Store the inferred return type
+        functionSignatures.put(name, sig.withReturnType(bodyType));
     }
 
     // ---- Pass 2: Function body checking ----
@@ -204,6 +295,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
     private void checkReturnType(ReLangType actual, ReLangType expected, org.antlr.v4.runtime.ParserRuleContext ctx) {
         if (expected instanceof ReLangType.UnknownType || actual instanceof ReLangType.UnknownType) return;
+        if (expected == null) return; // should not happen after inference, but guard
         if (!actual.isAssignableTo(expected)) {
             addError(ctx, "Return type mismatch: expected " + expected.displayName()
                     + " but got " + actual.displayName());
@@ -373,8 +465,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         var name = ctx.ID().getText();
         var type = currentScope.lookup(name);
         if (type == null) {
-            // Untyped variable - don't error, just return Unknown for backward compat
-            // The variable might be defined by a bare assignment (x = 10;)
+            addError(ctx, "Undefined variable '" + name + "'");
             return ReLangType.UnknownType.INSTANCE;
         }
         return type;
@@ -433,7 +524,17 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             }
         }
 
-        return sig.returnType();
+        // During return type inference, if the called function's return type is still pending
+        // (null) and it's currently being inferred, we have a recursive call needing explicit annotation
+        var returnType = sig.returnType();
+        if (returnType == null) {
+            if (inferring.contains(funcName)) {
+                addError(ctx, "Cannot infer return type for recursive function '" + funcName
+                        + "'; add explicit return type annotation");
+            }
+            return ReLangType.UnknownType.INSTANCE;
+        }
+        return returnType;
     }
 
     // ---- Visitor overrides: Await ----
@@ -457,12 +558,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     public ReLangType visitStatementLet(ReLangParser.StatementLetContext ctx) {
         var rhsType = visit(ctx.expr());
         var varName = ctx.ID().getText();
-        // If initialized to none, widen to Unknown so reassignment to any type is allowed
-        if (rhsType instanceof ReLangType.NoneType) {
-            currentScope.define(varName, ReLangType.UnknownType.INSTANCE);
-        } else {
-            currentScope.define(varName, rhsType);
-        }
+        currentScope.define(varName, rhsType);
         return ReLangType.UnitType.INSTANCE;
     }
 
@@ -474,8 +570,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
         var existingType = currentScope.lookup(varName);
         if (existingType == null) {
-            // Implicit define (bare assignment like `x = 10;`) - backward compat
-            currentScope.define(varName, rhsType);
+            addError(ctx, "Undefined variable '" + varName + "'");
         } else {
             // Check type compatibility
             if (!(existingType instanceof ReLangType.UnknownType) && !(rhsType instanceof ReLangType.UnknownType)) {
@@ -576,6 +671,12 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (currentFunctionReturnType != null) {
             checkReturnType(exprType, currentFunctionReturnType, ctx);
         }
+        // During return type inference, track the return expression type
+        if (inferredReturnFromStatements == null) {
+            inferredReturnFromStatements = exprType;
+        } else {
+            inferredReturnFromStatements = unifyTypes(inferredReturnFromStatements, exprType);
+        }
         return ReLangType.UnitType.INSTANCE;
     }
 
@@ -646,7 +747,6 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 if (!(subjectType instanceof ReLangType.UnknownType) && !(patType instanceof ReLangType.UnknownType)) {
                     if (!patType.isAssignableTo(subjectType) && !subjectType.isAssignableTo(patType)) {
                         // Only error on clearly incompatible types, but be lenient
-                        // (e.g., matching Optional against None is fine)
                     }
                 }
             }

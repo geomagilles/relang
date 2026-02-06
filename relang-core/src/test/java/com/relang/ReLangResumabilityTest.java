@@ -45,7 +45,7 @@ public class ReLangResumabilityTest {
     @Test
     void testSimpleCheckpoint() {
         String src = """
-                x = 10;
+                let x = 10;
                 checkpoint;
                 x + 20;
                 """;
@@ -67,8 +67,8 @@ public class ReLangResumabilityTest {
     @Test
     void testCheckpointInFunction() {
         String src = """
-                fn work() {
-                    x = 10;
+                fn work(): Int {
+                    let x = 10;
                     checkpoint;
                     return x + 20;
                 }
@@ -91,14 +91,14 @@ public class ReLangResumabilityTest {
     @Test
     void testCheckpointInNestedFunction() {
         String src = """
-                fn inner() {
-                    y = 5;
+                fn inner(): Int {
+                    let y = 5;
                     checkpoint;
                     return y * 2;
                 }
-                fn outer() {
-                    x = 10;
-                    result = inner();
+                fn outer(): Int {
+                    let x = 10;
+                    let result = inner();
                     return x + result;
                 }
                 outer();
@@ -125,7 +125,7 @@ public class ReLangResumabilityTest {
     @Test
     void testMultipleCheckpoints() {
         String src = """
-                x = 1;
+                let x = 1;
                 checkpoint;
                 x = x + 10;
                 checkpoint;
@@ -154,9 +154,9 @@ public class ReLangResumabilityTest {
     @Test
     void testCheckpointPreservesLocalVariables() {
         String src = """
-                a = 1;
-                b = 2;
-                c = 3;
+                let a = 1;
+                let b = 2;
+                let c = 3;
                 checkpoint;
                 a + b + c;
                 """;
@@ -174,9 +174,9 @@ public class ReLangResumabilityTest {
     @Test
     void testSerializationRoundTrip() throws Exception {
         String src = """
-                fn compute() {
-                    x = 42;
-                    y = 100;
+                fn compute(): Int {
+                    let x = 42;
+                    let y = 100;
                     checkpoint;
                     return x + y;
                 }
@@ -219,14 +219,14 @@ public class ReLangResumabilityTest {
     @Test
     void testSerializationWithNestedCalls() throws Exception {
         String src = """
-                fn inner() {
-                    a = 10;
+                fn inner(): Int {
+                    let a = 10;
                     checkpoint;
                     return a * 3;
                 }
-                fn outer() {
-                    b = 5;
-                    result = inner();
+                fn outer(): Int {
+                    let b = 5;
+                    let result = inner();
                     return b + result;
                 }
                 outer();
@@ -262,7 +262,7 @@ public class ReLangResumabilityTest {
     @Test
     void testJsonStructureSimple() {
         String src = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x;
                 """;
@@ -304,8 +304,8 @@ public class ReLangResumabilityTest {
     @Test
     void testJsonStructureWithBooleans() {
         String src = """
-                x = 1;
-                flag = 1 < 2;
+                let x = 1;
+                let flag = 1 < 2;
                 checkpoint;
                 if (flag) { x = x + 100; }
                 x;
@@ -341,14 +341,14 @@ public class ReLangResumabilityTest {
     @Test
     void testJsonStructureNestedCalls() {
         String src = """
-                fn inner() {
-                    a = 10;
+                fn inner(): Int {
+                    let a = 10;
                     checkpoint;
                     return a * 3;
                 }
-                fn outer() {
-                    b = 5;
-                    result = inner();
+                fn outer(): Int {
+                    let b = 5;
+                    let result = inner();
                     return b + result;
                 }
                 outer();
@@ -400,11 +400,11 @@ public class ReLangResumabilityTest {
     @Test
     void testJsonStructureMultipleVariables() {
         String src = """
-                a = 1;
-                b = 2;
-                c = 3;
-                d = 4;
-                e = 5;
+                let a = 1;
+                let b = 2;
+                let c = 3;
+                let d = 4;
+                let e = 5;
                 checkpoint;
                 a + b + c + d + e;
                 """;
@@ -436,7 +436,7 @@ public class ReLangResumabilityTest {
     @Test
     void testJsonExecutionPathStructure() {
         String src = """
-                x = 1;
+                let x = 1;
                 x = x + 1;
                 x = x + 1;
                 checkpoint;
@@ -474,7 +474,7 @@ public class ReLangResumabilityTest {
     @Test
     void testJsonPrettyPrinted() {
         String src = """
-                myVar = 42;
+                let myVar = 42;
                 checkpoint;
                 myVar;
                 """;
@@ -498,9 +498,9 @@ public class ReLangResumabilityTest {
     @Test
     void testProtoSerializationRoundTrip() throws Exception {
         String src = """
-                fn compute() {
-                    x = 42;
-                    y = 100;
+                fn compute(): Int {
+                    let x = 42;
+                    let y = 100;
                     checkpoint;
                     return x + y;
                 }
@@ -534,8 +534,8 @@ public class ReLangResumabilityTest {
     @Test
     void testProtoStructure() throws Exception {
         String src = """
-                x = 42;
-                flag = 1 < 2;
+                let x = 42;
+                let flag = 1 < 2;
                 checkpoint;
                 x;
                 """;
@@ -575,14 +575,14 @@ public class ReLangResumabilityTest {
     @Test
     void testProtoWithNestedCalls() throws Exception {
         String src = """
-                fn inner() {
-                    a = 10;
+                fn inner(): Int {
+                    let a = 10;
                     checkpoint;
                     return a * 3;
                 }
-                fn outer() {
-                    b = 5;
-                    result = inner();
+                fn outer(): Int {
+                    let b = 5;
+                    let result = inner();
                     return b + result;
                 }
                 outer();
@@ -623,11 +623,11 @@ public class ReLangResumabilityTest {
     @Test
     void testProtoSmallerThanJson() {
         String src = """
-                a = 1;
-                b = 2;
-                c = 3;
-                d = 4;
-                e = 5;
+                let a = 1;
+                let b = 2;
+                let c = 3;
+                let d = 4;
+                let e = 5;
                 checkpoint;
                 a + b + c + d + e;
                 """;
@@ -651,9 +651,9 @@ public class ReLangResumabilityTest {
     @Test
     void testProtoAndJsonProduceSameResult() throws Exception {
         String src = """
-                fn work() {
-                    x = 123;
-                    flag = 1 == 1;
+                fn work(): Int {
+                    let x = 123;
+                    let flag = 1 == 1;
                     checkpoint;
                     if (flag) { return x * 2; }
                     return 0;
@@ -689,7 +689,7 @@ public class ReLangResumabilityTest {
     @Test
     void testSourceHashIncludedInState() {
         String src = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x;
                 """;
@@ -706,7 +706,7 @@ public class ReLangResumabilityTest {
     @Test
     void testSourceHashInJson() {
         String src = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x;
                 """;
@@ -730,7 +730,7 @@ public class ReLangResumabilityTest {
     @Test
     void testSourceHashInProto() throws Exception {
         String src = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x;
                 """;
@@ -753,7 +753,7 @@ public class ReLangResumabilityTest {
     @Test
     void testSameCodeProducesSameHash() {
         String src = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x;
                 """;
@@ -779,13 +779,13 @@ public class ReLangResumabilityTest {
     @Test
     void testDifferentCodeProducesDifferentHash() {
         String src1 = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x;
                 """;
 
         String src2 = """
-                x = 43;
+                let x = 43;
                 checkpoint;
                 x;
                 """;
@@ -811,14 +811,14 @@ public class ReLangResumabilityTest {
     @Test
     void testResumeWithChangedCodeFails() {
         String srcOriginal = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x + 10;
                 """;
 
         String srcModified = """
-                x = 42;
-                y = 1;
+                let x = 42;
+                let y = 1;
                 checkpoint;
                 x + 10;
                 """;
@@ -844,7 +844,7 @@ public class ReLangResumabilityTest {
     @Test
     void testResumeWithSameCodeSucceeds() {
         String src = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x + 10;
                 """;
@@ -1125,13 +1125,13 @@ public class ReLangResumabilityTest {
     @Test
     void testHashValidationWorksAcrossSerializationFormats() throws Exception {
         String srcOriginal = """
-                x = 42;
+                let x = 42;
                 checkpoint;
                 x;
                 """;
 
         String srcModified = """
-                x = 99;
+                let x = 99;
                 checkpoint;
                 x;
                 """;

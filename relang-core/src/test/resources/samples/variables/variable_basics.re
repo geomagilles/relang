@@ -19,9 +19,8 @@ let a = 10;
 let b = a + 5;
 let c = a + b;
 
-// Optional (none)
+// Optional (none) — none is its own type
 let email = none;
-email = "alice@example.com";
 
 // Swap
 let p = 1;

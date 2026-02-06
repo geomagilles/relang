@@ -147,22 +147,28 @@ public class VariableDeclarationTest {
         }
     }
 
-    // --- Legacy assignment (without let) ---
+    // --- Bare assignment is rejected ---
 
     @Nested
-    @DisplayName("Legacy assignment (without let)")
-    class LegacyAssignment {
+    @DisplayName("Bare assignment (without let) is rejected")
+    class BareAssignment {
 
         @Test
-        @DisplayName("assignment without let")
+        @DisplayName("assignment without let is a type error")
         void testAssignmentWithoutLet() {
-            assertEval("x = 10; x;", 10);
+            var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    org.graalvm.polyglot.PolyglotException.class,
+                    () -> context.eval("relang", "x = 10; x;"));
+            org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("Undefined variable"));
         }
 
         @Test
-        @DisplayName("multiple assignments without let")
+        @DisplayName("multiple bare assignments are type errors")
         void testMultipleAssignments() {
-            assertEval("x = 10; y = 20; x + y;", 30);
+            var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    org.graalvm.polyglot.PolyglotException.class,
+                    () -> context.eval("relang", "x = 10; y = 20; x + y;"));
+            org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("Undefined variable"));
         }
     }
 
@@ -180,9 +186,15 @@ public class VariableDeclarationTest {
         }
 
         @Test
-        @DisplayName("optional variable later assigned a value")
-        void testOptionalThenAssign() {
-            assertEval("let email = none; email = \"alice@example.com\"; email;", "alice@example.com");
+        @DisplayName("none variable cannot be reassigned to a different type")
+        void testNoneCannotReassignDifferentType() {
+            // let email = none defines email as NoneType;
+            // reassigning to String is a type error
+            var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    org.graalvm.polyglot.PolyglotException.class,
+                    () -> context.eval("relang", "let email = none; email = \"alice@example.com\"; email;"));
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    ex.getMessage().contains("Cannot assign") || ex.getMessage().contains("TypeError"));
         }
     }
 

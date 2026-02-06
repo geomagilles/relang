@@ -14,11 +14,11 @@ fn findOrNone(x: Int): Int? {
 // Expression body with annotations
 fn double(x: Int): Int = x * 2;
 
-// Without annotations (also valid)
-fn square(x) = x * x;
+// Inferred return type
+fn square(x: Int) = x * x;
 
-// Mixed: some params annotated, some not
-fn mixed(a: Int, b) { return a + b; }
+// Fully annotated
+fn mixed(a: Int, b: Int): Int { return a + b; }
 
 let r1 = add(3, 4);          // 7
 let r2 = findOrNone(5);      // 5

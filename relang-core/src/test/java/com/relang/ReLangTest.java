@@ -34,9 +34,9 @@ public class ReLangTest {
 
     @Test
     void testVariables() {
-        assertEval("x = 10; x;", 10);
-        assertEval("x = 10; y = 20; x + y;", 30);
-        assertEval("x = 10; x = 20; x;", 20);
+        assertEval("let x = 10; x;", 10);
+        assertEval("let x = 10; let y = 20; x + y;", 30);
+        assertEval("let x = 10; x = 20; x;", 20);
     }
 
     @Test
@@ -49,30 +49,30 @@ public class ReLangTest {
 
     @Test
     void testIf() {
-        assertEval("if (true) { x=10; } else { x=20; } x;", 10);
-        assertEval("if (false) { x=10; } else { x=20; } x;", 20);
-        assertEval("x=0; if (1 < 2) { x=100; } x;", 100);
+        assertEval("let x = 0; if (true) { x=10; } else { x=20; } x;", 10);
+        assertEval("let x = 0; if (false) { x=10; } else { x=20; } x;", 20);
+        assertEval("let x = 0; if (1 < 2) { x=100; } x;", 100);
     }
 
     @Test
     void testWhile() {
-        assertEval("i = 0; while (i < 5) { i = i + 1; } i;", 5);
-        assertEval("i = 10; sum = 0; while (0 < i) { sum = sum + i; i = i - 1; } sum;", 55);
+        assertEval("let i = 0; while (i < 5) { i = i + 1; } i;", 5);
+        assertEval("let i = 10; let sum = 0; while (0 < i) { sum = sum + i; i = i - 1; } sum;", 55);
     }
 
     @Test
     void testFunctions() {
-        String src = "fn add(a, b) { return a + b; } add(10, 20);";
+        String src = "fn add(a: Int, b: Int): Int { return a + b; } add(10, 20);";
         assertEval(src, 30);
 
-        String src2 = "fn fac(n) { if (n < 2) { return 1; } else { return n * fac(n - 1); } } fac(5);";
+        String src2 = "fn fac(n: Int): Int { if (n < 2) { return 1; } else { return n * fac(n - 1); } } fac(5);";
         assertEval(src2, 120);
     }
 
     @Test
     void testIntegration() {
         String src = """
-                    fn fib(n) {
+                    fn fib(n: Int): Int {
                         if (n < 2) { return n; }
                         return fib(n - 1) + fib(n - 2);
                     }
@@ -177,8 +177,8 @@ public class ReLangTest {
 
     @Test
     void testIfWithoutParens() {
-        assertEval("x = 10; if x > 5 { x = 1; } else { x = 2; } x;", 1);
-        assertEval("x = 3; if x > 5 { x = 1; } else { x = 2; } x;", 2);
+        assertEval("let x = 10; if x > 5 { x = 1; } else { x = 2; } x;", 1);
+        assertEval("let x = 3; if x > 5 { x = 1; } else { x = 2; } x;", 2);
     }
 
     @Test
@@ -474,8 +474,8 @@ public class ReLangTest {
 
     @Test
     void testExprBodyNoTypeAnnotation() {
-        // Expression body without type annotations
-        assertEval("fn square(x) = x * x; square(6);", 36);
+        // Expression body with param type, inferred return type
+        assertEval("fn square(x: Int) = x * x; square(6);", 36);
     }
 
     @Test

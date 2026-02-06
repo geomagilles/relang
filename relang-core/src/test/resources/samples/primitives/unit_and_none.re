@@ -14,7 +14,7 @@ let r = match x {
 };
 
 // Function that may return none
-fn findOrNone(x: Int) {
+fn findOrNone(x: Int): Int? {
     if x > 0 { x } else { none }
 }
 

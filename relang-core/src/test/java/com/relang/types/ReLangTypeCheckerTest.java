@@ -622,11 +622,42 @@ public class ReLangTypeCheckerTest {
         }
 
         @Test
-        @DisplayName("Untyped code still works")
-        void testUntypedCode() {
-            assertEval("fn add(a, b) { return a + b; } add(3, 4);", 7);
-            assertEval("x = 10; y = 20; x + y;", 30);
-            assertEval("fn fac(n) { if (n < 2) { return 1; } return n * fac(n - 1); } fac(5);", 120);
+        @DisplayName("Untyped parameters are rejected")
+        void testUntypedParamsRejected() {
+            assertTypeError("fn add(a, b) { return a + b; } add(3, 4);",
+                    "must have a type annotation");
+        }
+
+        @Test
+        @DisplayName("Bare assignment to undefined variable is rejected")
+        void testBareAssignmentRejected() {
+            assertTypeError("x = 10; x;", "Undefined variable");
+        }
+
+        @Test
+        @DisplayName("Recursive function without return type is rejected")
+        void testRecursiveNoReturnType() {
+            assertTypeError(
+                    "fn fac(n: Int) { if n < 2 { 1 } else { n * fac(n - 1) } } fac(5);",
+                    "Cannot infer return type for recursive function");
+        }
+
+        @Test
+        @DisplayName("Recursive function with explicit return type works")
+        void testRecursiveWithReturnType() {
+            assertEval("fn fac(n: Int): Int { if n < 2 { 1 } else { n * fac(n - 1) } } fac(5);", 120);
+        }
+
+        @Test
+        @DisplayName("Return type inference works for non-recursive functions")
+        void testReturnTypeInference() {
+            assertEval("fn square(x: Int) = x * x; square(5);", 25);
+        }
+
+        @Test
+        @DisplayName("Return type inference for block body")
+        void testReturnTypeInferenceBlock() {
+            assertEval("fn double(x: Int) { x * 2 } double(5);", 10);
         }
 
         @Test
@@ -709,9 +740,10 @@ public class ReLangTypeCheckerTest {
         }
 
         @Test
-        @DisplayName("partially typed function")
+        @DisplayName("partially typed function is rejected")
         void testPartiallyTyped() {
-            assertEval("fn add(a: Int, b) { return a + b; } add(3, 4);", 7);
+            assertTypeError("fn add(a: Int, b) { return a + b; } add(3, 4);",
+                    "must have a type annotation");
         }
     }
 

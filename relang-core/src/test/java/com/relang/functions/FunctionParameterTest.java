@@ -104,15 +104,21 @@ public class FunctionParameterTest {
         }
 
         @Test
-        @DisplayName("untyped parameters")
+        @DisplayName("untyped parameters are rejected")
         void testUntypedParams() {
-            assertEval("fn add(a, b) { return a + b; } add(3, 4);", 7);
+            var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    org.graalvm.polyglot.PolyglotException.class,
+                    () -> context.eval("relang", "fn add(a, b) { return a + b; } add(3, 4);"));
+            org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("must have a type annotation"));
         }
 
         @Test
-        @DisplayName("partially typed parameters")
+        @DisplayName("partially typed parameters are rejected")
         void testPartiallyTyped() {
-            assertEval("fn add(a: Int, b) { return a + b; } add(3, 4);", 7);
+            var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    org.graalvm.polyglot.PolyglotException.class,
+                    () -> context.eval("relang", "fn add(a: Int, b) { return a + b; } add(3, 4);"));
+            org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("must have a type annotation"));
         }
     }
 
