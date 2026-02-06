@@ -16,7 +16,7 @@ public abstract class ReLangNode extends Node {
      * Unit value returned by statements that don't produce a meaningful result.
      * Used by control flow nodes (if without else, while, empty blocks).
      */
-    public static final long UNIT = 0L;
+    public static final Object UNIT = ReLangUnit.SINGLETON;
 
     /**
      * The execute method that every node must implement.
@@ -30,19 +30,17 @@ public abstract class ReLangNode extends Node {
 
     /**
      * Evaluate a value as a boolean condition.
-     * Supports ReLang's C-style truthiness: booleans directly, longs where 0 is false.
+     * Only Bool values are accepted — no implicit truthiness for Int or other types.
      *
      * @param value the result of evaluating a condition expression
-     * @return the boolean interpretation
-     * @throws IllegalArgumentException if the value is not a valid condition type
+     * @return the boolean value
+     * @throws ReLangTypeError if the value is not Bool
      */
-    protected static boolean evaluateAsBoolean(Object value) {
+    protected boolean evaluateAsBoolean(Object value) {
         return switch (value) {
             case Boolean b -> b;
-            case Long l -> l != 0;
-            case null -> throw new IllegalArgumentException("Condition cannot be null");
-            default -> throw new IllegalArgumentException(
-                    "Condition must be boolean or long, got: " + value.getClass().getSimpleName());
+            default -> throw new ReLangTypeError(this,
+                    "Condition must be Bool, got: " + (value == null ? "none" : value.getClass().getSimpleName()));
         };
     }
 }
