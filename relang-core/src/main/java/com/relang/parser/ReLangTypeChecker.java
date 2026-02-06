@@ -944,10 +944,6 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         for (var stmt : ctx.statement()) {
             lastType = visit(stmt);
         }
-        // Trailing expression (expression blocks like { stmt*; expr })
-        if (ctx.expr() != null) {
-            lastType = visit(ctx.expr());
-        }
 
         currentScope = savedScope;
         return lastType;

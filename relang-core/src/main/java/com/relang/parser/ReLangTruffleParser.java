@@ -215,10 +215,6 @@ public class ReLangTruffleParser {
         for (var stmt : ctx.statement()) {
             nodes.add(parseStatement(context, stmt));
         }
-        // Handle trailing expression without semicolon (expression blocks like { 1 })
-        if (ctx.expr() != null) {
-            nodes.add(parseExpr(context, ctx.expr()));
-        }
         return new ReLangBlockNode(nodes.toArray(new ReLangNode[0]));
     }
 

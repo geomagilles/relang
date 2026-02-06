@@ -46,24 +46,23 @@ command
     ;
 
 statement
-    : 'let' ID (':' typeRef)? '=' expr ';'                     # StatementLet
-    | assignment ';'                                             # StatementAssignment
+    : 'let' ID (':' typeRef)? '=' expr ';'?                    # StatementLet
+    | assignment ';'?                                            # StatementAssignment
     | 'if' '(' expr ')' block ('else' block)?                   # StatementIf
     | 'if' expr block ('else' block)?                            # StatementIfNoParens
     | 'while' '(' expr ')' block                                # StatementWhile
     | 'while' expr block                                         # StatementWhileNoParens
     | 'for' ID 'in' expr '..' expr block                        # StatementForRange
     | 'for' ID 'in' expr '..=' expr block                       # StatementForRangeInclusive
-    | 'return' expr ';'                                          # StatementReturn
-    | 'break' ';'                                                # StatementBreak
-    | 'continue' ';'                                             # StatementContinue
-    | 'checkpoint' ';'                                           # StatementCheckpoint
-    | expr ';'                                                   # StatementExpr
+    | 'return' expr ';'?                                         # StatementReturn
+    | 'break' ';'?                                               # StatementBreak
+    | 'continue' ';'?                                            # StatementContinue
+    | 'checkpoint' ';'?                                          # StatementCheckpoint
+    | expr ';'?                                                  # StatementExpr
     ;
 
 block
     : '{' statement* '}'
-    | '{' statement* expr '}'
     ;
 
 assignment
