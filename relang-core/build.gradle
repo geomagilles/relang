@@ -14,6 +14,9 @@ dependencies {
     // GraalVM tools for debugging
     runtimeOnly libs.graalvm.tools.dap
 
+    // LSP types for publishing diagnostics (provided at runtime by lsp-tool)
+    compileOnly libs.graalvm.tools.lsp
+
     // Annotation processor for Truffle DSL
     annotationProcessor libs.graalvm.truffle.dsl.processor
 

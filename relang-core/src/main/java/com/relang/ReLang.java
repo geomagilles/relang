@@ -34,7 +34,26 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
         var checker = new com.relang.parser.ReLangTypeChecker();
         var typeErrors = checker.check(tree);
         if (!typeErrors.isEmpty()) {
-            throw new com.relang.parser.ReLangTypeCheckException(typeErrors);
+            // Try to publish as LSP diagnostics (when running under LSP server)
+            try {
+                // Use reflection to avoid class loading issues when LSP is not available
+                Class<?> helperClass = Class.forName("com.relang.LspDiagnosticsHelper");
+                var method = helperClass.getMethod("buildDiagnosticsNotification",
+                        Object.class, Object.class);
+                throw (Exception) method.invoke(null, request.getSource().getURI(), typeErrors);
+            } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchMethodException e) {
+                // LSP tool not on classpath (CLI mode) — fall back to exception
+                throw new com.relang.parser.ReLangTypeCheckException(typeErrors);
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                // Unwrap the actual exception thrown by buildDiagnosticsNotification
+                if (e.getCause() instanceof Exception cause) {
+                    throw cause;
+                }
+                throw new com.relang.parser.ReLangTypeCheckException(typeErrors);
+            } catch (IllegalAccessException e) {
+                // Shouldn't happen, but fall back to exception if it does
+                throw new com.relang.parser.ReLangTypeCheckException(typeErrors);
+            }
         }
 
         // Step 3: Build Truffle nodes
