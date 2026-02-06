@@ -1,3 +1,3 @@
-x = 10;
-y = 20;
-result = x + y;
+let x = 10;
+let y = 20;
+let result = x + y;

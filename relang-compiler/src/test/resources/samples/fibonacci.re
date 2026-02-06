@@ -1,14 +1,14 @@
-fn fibonacci(n) {
+fn fibonacci(n: Int): Int {
     if (n < 2) {
         return n;
     }
 
-    a = 0;
-    b = 1;
-    i = 2;
+    let a = 0;
+    let b = 1;
+    let i = 2;
 
     while (i < n + 1) {
-        temp = a + b;
+        let temp = a + b;
         a = b;
         b = temp;
         i = i + 1;
@@ -17,4 +17,4 @@ fn fibonacci(n) {
     return b;
 }
 
-result = fibonacci(10);
+let result = fibonacci(10);
