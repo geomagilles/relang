@@ -1,27 +1,26 @@
-fn abs(x) {
-    if (x < 0) {
-        return 0 - x;
-    } else {
-        return x;
+// Control flow showcasing v0.1 syntax
+fn abs(x: Int): Int =
+    if x < 0 { -x } else { x };
+
+fn is_even(n: Int): Bool = n % 2 == 0;
+
+fn count_down(n: Int): Int {
+    let i = n;
+    while i > 0 {
+        i = i - 1;
     }
+    i
 }
 
-fn is_even(n) {
-    half = n / 2;
-    doubled = half * 2;
-    if (doubled == n) {
-        return 1;
+fn sum_range(n: Int): Int {
+    let total = 0;
+    for i in 1..=n {
+        total = total + i;
     }
-    return 0;
+    total
 }
 
-fn count_down(n) {
-    while (n < 1 == 0) {
-        n = n - 1;
-    }
-    return n;
-}
-
-r1 = abs(0 - 42);
-r2 = is_even(10);
-r3 = count_down(5);
+let r1 = abs(-42);
+let r2 = is_even(10);
+let r3 = count_down(5);
+let r4 = sum_range(10);

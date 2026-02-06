@@ -13,4 +13,14 @@ public abstract class AddNode extends ReLangNode {
     protected long add(long left, long right) {
         return left + right;
     }
+
+    @Specialization
+    protected double add(double left, double right) {
+        return left + right;
+    }
+
+    @Specialization
+    protected String concat(String left, String right) {
+        return left + right;
+    }
 }

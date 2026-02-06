@@ -1,20 +1,20 @@
-fn fibonacci(n) {
-    if (n < 2) {
-        return n;
-    }
+// Fibonacci showcasing v0.1 syntax
 
-    a = 0;
-    b = 1;
-    i = 2;
+// Recursive version
+fn fib(n: Int): Int =
+    if n < 2 { n } else { fib(n - 1) + fib(n - 2) };
 
-    while (i < n + 1) {
-        temp = a + b;
+// Iterative version
+fn fibonacci(n: Int): Int {
+    if n < 2 { return n; }
+    let a = 0;
+    let b = 1;
+    for i in 2..=n {
+        let temp = a + b;
         a = b;
         b = temp;
-        i = i + 1;
     }
-
-    return b;
+    b
 }
 
-result = fibonacci(10);
+let result = fibonacci(10);

@@ -1,9 +1,9 @@
 package com.relang;
 
-import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.nodes.Node;
+import com.relang.nodes.AwaitableTable;
 import com.relang.nodes.FrameState;
 import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
@@ -20,7 +20,8 @@ public final class ReLangContext {
     private static final TruffleLanguage.ContextReference<ReLangContext> REF =
             TruffleLanguage.ContextReference.create(ReLang.class);
     private final TruffleLanguage.Env env;
-    private final Map<String, RootCallTarget> functionRegistry = new HashMap<>();
+    private final Map<String, FunctionDescriptor> functionRegistry = new HashMap<>();
+    private final AwaitableTable awaitableTable = new AwaitableTable();
     // The frame state for the currently executing function during resume
     private FrameState activeFrameState;
     // SHA-256 hash of the current source code, used for state validation
@@ -46,7 +47,7 @@ public final class ReLangContext {
         return env;
     }
 
-    public Map<String, RootCallTarget> getFunctionRegistry() {
+    public Map<String, FunctionDescriptor> getFunctionRegistry() {
         return functionRegistry;
     }
 
@@ -82,5 +83,17 @@ public final class ReLangContext {
 
     public void setActiveFrameState(FrameState state) {
         this.activeFrameState = state;
+    }
+
+    public AwaitableTable getAwaitableTable() {
+        return awaitableTable;
+    }
+
+    /**
+     * Restore awaitable table entries from a resumed state.
+     * Merges the given table's entries into this context's table.
+     */
+    public void restoreAwaitableTable(AwaitableTable table) {
+        this.awaitableTable.getAll().putAll(table.getAll());
     }
 }

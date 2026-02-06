@@ -13,4 +13,9 @@ public abstract class SubNode extends ReLangNode {
     protected long sub(long left, long right) {
         return left - right;
     }
+
+    @Specialization
+    protected double sub(double left, double right) {
+        return left - right;
+    }
 }

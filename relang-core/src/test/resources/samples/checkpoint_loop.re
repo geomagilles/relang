@@ -1,14 +1,11 @@
-fn sum_with_checkpoints(n) {
-    total = 0;
-    i = 1;
-
-    while (i < n + 1) {
+// Checkpoint inside a loop showcasing v0.1 syntax
+fn sum_with_checkpoints(n: Int): Int {
+    let total = 0;
+    for i in 1..=n {
         total = total + i;
         checkpoint;
-        i = i + 1;
     }
-
-    return total;
+    total
 }
 
-result = sum_with_checkpoints(5);
+let result = sum_with_checkpoints(5);

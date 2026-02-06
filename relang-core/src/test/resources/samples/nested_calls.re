@@ -1,20 +1,15 @@
-fn double(x) {
-    return x * 2;
+// Nested function calls showcasing v0.1 syntax
+fn double(x: Int): Int = x * 2;
+
+fn triple(x: Int): Int = x * 3;
+
+fn add(a: Int, b: Int): Int = a + b;
+
+fn complex_calculation(n: Int): Int {
+    let a = double(n);
+    let b = triple(n);
+    let c = add(a, b);
+    double(c)
 }
 
-fn triple(x) {
-    return x * 3;
-}
-
-fn add(a, b) {
-    return a + b;
-}
-
-fn complex_calculation(n) {
-    a = double(n);
-    b = triple(n);
-    c = add(a, b);
-    return double(c)
-    }}
-
-result = complex_calculation(5);
+let result = complex_calculation(5);

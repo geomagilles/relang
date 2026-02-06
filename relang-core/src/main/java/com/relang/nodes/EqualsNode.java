@@ -18,4 +18,14 @@ public abstract class EqualsNode extends ReLangNode {
     protected boolean equals(boolean left, boolean right) {
         return left == right;
     }
+
+    @Specialization
+    protected boolean equals(double left, double right) {
+        return left == right;
+    }
+
+    @Specialization
+    protected boolean equals(String left, String right) {
+        return left.equals(right);
+    }
 }

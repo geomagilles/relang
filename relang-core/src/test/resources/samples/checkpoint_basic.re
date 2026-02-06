@@ -1,8 +1,8 @@
-fn process(x) {
-    result = x * 2;
+// Basic checkpoint/resume showcasing v0.1 syntax
+fn process(x: Int): Int {
+    let result = x * 2;
     checkpoint;
-    result = result + 10;
-    return result;
+    result + 10
 }
 
-output = process(5);
+let output = process(5);

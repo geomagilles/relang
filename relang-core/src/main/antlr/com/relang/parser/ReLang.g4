@@ -10,11 +10,20 @@ source
     ;
 
 function
-    : 'fn' ID '(' parameters? ')' block
+    : 'fn' ID '(' typedParameters? ')' (':' typeRef)? block           # FunctionBlock
+    | 'fn' ID '(' typedParameters? ')' (':' typeRef)? '=' expr ';'?   # FunctionExpr
     ;
 
-parameters
-    : ID (',' ID)*
+typedParameters
+    : typedParam (',' typedParam)*
+    ;
+
+typedParam
+    : ID (':' typeRef)? ('=' expr)?
+    ;
+
+typeRef
+    : ID '?'?
     ;
 
 command
@@ -22,16 +31,24 @@ command
     ;
 
 statement
-    : assignment ';'                  # StatementAssignment
-    | 'if' '(' expr ')' block ('else' block)?  # StatementIf
-    | 'while' '(' expr ')' block      # StatementWhile
-    | 'return' expr ';'               # StatementReturn
-    | 'checkpoint' ';'                # StatementCheckpoint
-    | expr ';'                        # StatementExpr
+    : 'let' ID '=' expr ';'                                    # StatementLet
+    | assignment ';'                                             # StatementAssignment
+    | 'if' '(' expr ')' block ('else' block)?                   # StatementIf
+    | 'if' expr block ('else' block)?                            # StatementIfNoParens
+    | 'while' '(' expr ')' block                                # StatementWhile
+    | 'while' expr block                                         # StatementWhileNoParens
+    | 'for' ID 'in' expr '..' expr block                        # StatementForRange
+    | 'for' ID 'in' expr '..=' expr block                       # StatementForRangeInclusive
+    | 'return' expr ';'                                          # StatementReturn
+    | 'break' ';'                                                # StatementBreak
+    | 'continue' ';'                                             # StatementContinue
+    | 'checkpoint' ';'                                           # StatementCheckpoint
+    | expr ';'                                                   # StatementExpr
     ;
 
 block
     : '{' statement* '}'
+    | '{' statement* expr '}'
     ;
 
 assignment
@@ -39,20 +56,60 @@ assignment
     ;
 
 expr
-    : left=expr op=('*'|'/') right=expr  # ExprBinary
-    | left=expr op=('+'|'-') right=expr  # ExprBinary
-    | left=expr op=('<'|'==') right=expr # ExprBinary
-    | ID '(' arguments? ')'              # ExprCall
-    | ID                                 # ExprId
-    | INT                                # ExprInt
-    | '(' expr ')'                       # ExprDid
+    : 'await' expr                                               # ExprAwait
+    | 'not' expr                                                 # ExprNot
+    | '-' expr                                                   # ExprNegate
+    | left=expr op=('*'|'/'|'%') right=expr                     # ExprBinary
+    | left=expr op=('+'|'-') right=expr                          # ExprBinary
+    | left=expr op=('<'|'<='|'>'|'>='|'=='|'!=') right=expr     # ExprBinary
+    | left=expr 'and' right=expr                                 # ExprAnd
+    | left=expr 'or' right=expr                                  # ExprOr
+    | 'if' expr block 'else' block                               # ExprIfElse
+    | 'match' expr '{' matchArm (',' matchArm)* ','? '}'         # ExprMatchSubject
+    | 'match' '{' matchArm (',' matchArm)* ','? '}'              # ExprMatchSubjectless
+    | ID '(' callArguments? ')'                                   # ExprCall
+    | ID                                                          # ExprId
+    | INT                                                         # ExprInt
+    | FLOAT                                                       # ExprFloat
+    | STRING                                                      # ExprString
+    | 'true'                                                      # ExprTrue
+    | 'false'                                                     # ExprFalse
+    | 'none'                                                      # ExprNone
+    | 'unit'                                                      # ExprUnit
+    | '(' expr ')'                                                # ExprParen
     ;
 
-arguments
-    : expr (',' expr)*
+matchArm
+    : matchPattern '->' matchBody
+    ;
+
+matchPattern
+    : '_'                                                         # PatternWildcard
+    | 'none'                                                      # PatternNone
+    | expr                                                        # PatternExpr
+    ;
+
+matchBody
+    : block
+    | expr
+    ;
+
+callArguments
+    : callArg (',' callArg)*
+    ;
+
+callArg
+    : ID ':' expr                                                 # CallArgNamed
+    | expr                                                        # CallArgPositional
     ;
 
 // Lexer Rules
-ID  : [a-zA-Z_] [a-zA-Z0-9_]* ;
-INT : [0-9]+ ;
-WS  : [ \t\r\n]+ -> skip ;
+FLOAT : [0-9] ([0-9_]* [0-9])? '.' [0-9] ([0-9_]* [0-9])? ([eE] [+-]? [0-9]+)?
+      | [0-9] ([0-9_]* [0-9])? [eE] [+-]? [0-9]+
+      ;
+INT   : [0-9] ([0-9_]* [0-9])? ;
+STRING : '"' (ESC | ~["\\])* '"' ;
+fragment ESC : '\\' [nrt\\"$] ;
+ID    : [a-zA-Z_] [a-zA-Z0-9_]* ;
+WS    : [ \t\r\n]+ -> skip ;
+LINE_COMMENT : '//' ~[\r\n]* -> skip ;

@@ -33,7 +33,13 @@ public final class ReLangWhileNode extends ReLangNode {
         @Override
         public boolean executeRepeating(VirtualFrame frame) {
             if (evaluateAsBoolean(conditionNode.executeGeneric(frame))) {
-                bodyNode.executeGeneric(frame);
+                try {
+                    bodyNode.executeGeneric(frame);
+                } catch (ReLangBreakException e) {
+                    return false; // exit loop
+                } catch (ReLangContinueException e) {
+                    // skip rest of body, continue loop
+                }
                 return true;
             }
             return false;

@@ -13,4 +13,9 @@ public abstract class LessThanNode extends ReLangNode {
     protected boolean lessThan(long left, long right) {
         return left < right;
     }
+
+    @Specialization
+    protected boolean lessThan(double left, double right) {
+        return left < right;
+    }
 }
