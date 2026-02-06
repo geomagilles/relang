@@ -66,7 +66,6 @@ Options:
   --state-in <file>     Load execution state before running
   --state-out <file>    Save state when checkpoint is hit
   --state-format <fmt>  State format: json (default) | protobuf
-  --lsp                 Start LSP server
   --inspect             Enable debugger
   --help, -h            Show help
 

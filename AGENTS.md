@@ -30,6 +30,7 @@ Avoid:
 | Module            | Description                                                            | README                              |
 |-------------------|------------------------------------------------------------------------|-------------------------------------|
 | `relang-core`     | Truffle language implementation (parser, AST nodes, runtime, launcher) | [README](relang-core/README.md)     |
+| `relang-lsp`      | Standalone LSP server launcher                                          | [README](relang-lsp/README.md)      |
 | `relang-native`   | Native image build for `relang` interpreter                            | [README](relang-native/README.md)   |
 | `relang-compiler` | Compiler (`relangc`) producing standalone native executables           | [README](relang-compiler/README.md) |
 | `relang-textmate` | Shared TextMate grammar for syntax highlighting                        | [README](relang-textmate/README.md) |

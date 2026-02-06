@@ -14,8 +14,8 @@
 
     <h3>Optional: LSP Support</h3>
     <p>For code completion and go-to-definition, install the LSP4IJ plugin and configure
-    it to connect to localhost:8123. Then run your ReLang program with
-    <code>--experimental-options --lsp</code>.</p>
+    it to connect to localhost:8123. Then run:
+    <code>./gradlew :relang-lsp:run</code>.</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>

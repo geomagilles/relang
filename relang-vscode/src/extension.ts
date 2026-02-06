@@ -53,7 +53,7 @@ async function startLspClient(context: ExtensionContext) {
             socket.on('error', (err) => {
                 window.showWarningMessage(
                     `Could not connect to ReLang LSP server on port ${port}. ` +
-                    `Start your ReLang program with --experimental-options --lsp to enable LSP.`
+                    `Start it with: ./gradlew :relang-lsp:run --args="--port ${port}".`
                 );
                 reject(err);
             });

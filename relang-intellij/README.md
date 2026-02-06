@@ -67,11 +67,11 @@ In IntelliJ:
    - **Name**: `ReLang`
    - **Command**:
      ```
-     /path/to/relang/gradlew -p /path/to/relang :relang-core:run --args="--lsp" --console=plain -q
+     /path/to/relang/gradlew -p /path/to/relang :relang-lsp:run --args="--port 8123" --console=plain -q
      ```
      Replace `/path/to/relang` with your actual project path, e.g.:
      ```
-     /Users/gilles/dev/relang/gradlew -p /Users/gilles/dev/relang :relang-core:run --args="--lsp" --console=plain -q
+     /Users/gilles/dev/relang/gradlew -p /Users/gilles/dev/relang :relang-lsp:run --args="--port 8123" --console=plain -q
      ```
 4. In the **Mappings** tab, add:
    - **Language ID**: `relang`

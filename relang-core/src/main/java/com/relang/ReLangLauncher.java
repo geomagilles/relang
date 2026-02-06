@@ -2,12 +2,11 @@ package com.relang;
 
 import com.relang.launcher.ExitCodes;
 import com.relang.launcher.FileRunner;
-import com.relang.launcher.LspServer;
 import com.relang.launcher.Repl;
 
 /**
  * Main entry point for the ReLang interpreter.
- * Dispatches to LSP server, REPL, or file execution based on command-line arguments.
+ * Dispatches to REPL or file execution based on command-line arguments.
  */
 public class ReLangLauncher {
 
@@ -29,9 +28,7 @@ public class ReLangLauncher {
             return; // Help was printed
         }
 
-        if (parsed.lspMode) {
-            LspServer.start(parsed.lspPort);
-        } else if (parsed.filePath != null) {
+        if (parsed.filePath != null) {
             var config = new FileRunner.Config(
                     parsed.filePath,
                     parsed.inspect,
@@ -47,8 +44,6 @@ public class ReLangLauncher {
     }
 
     private record ParsedArgs(
-            boolean lspMode,
-            int lspPort,
             boolean inspect,
             int inspectPort,
             String filePath,
@@ -58,8 +53,6 @@ public class ReLangLauncher {
     ) {}
 
     private static ParsedArgs parseArgs(String[] args) {
-        boolean lspMode = false;
-        int lspPort = 8123;
         boolean inspect = false;
         int inspectPort = 4711;
         String filePath = null;
@@ -69,10 +62,6 @@ public class ReLangLauncher {
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
-                case "--lsp" -> lspMode = true;
-                case "--lsp.port" -> {
-                    if (i + 1 < args.length) lspPort = Integer.parseInt(args[++i]);
-                }
                 case "--inspect" -> inspect = true;
                 case "--inspect.port" -> {
                     if (i + 1 < args.length) inspectPort = Integer.parseInt(args[++i]);
@@ -98,14 +87,18 @@ public class ReLangLauncher {
                     return null;
                 }
                 default -> {
-                    if (!args[i].startsWith("-")) {
+                    if (args[i].startsWith("-")) {
+                        System.err.println("Unknown option: " + args[i]);
+                        System.err.println("LSP is now started via the relang-lsp module.");
+                        System.exit(ExitCodes.ERROR);
+                    } else {
                         filePath = args[i];
                     }
                 }
             }
         }
 
-        return new ParsedArgs(lspMode, lspPort, inspect, inspectPort, filePath, stateIn, stateOut, stateFormat);
+        return new ParsedArgs(inspect, inspectPort, filePath, stateIn, stateOut, stateFormat);
     }
 
     private static void printHelp() {
@@ -118,8 +111,6 @@ public class ReLangLauncher {
                   --state-in <file>     Load execution state before running
                   --state-out <file>    Save state when checkpoint is hit
                   --state-format <fmt>  State format: json (default) | protobuf
-                  --lsp                 Start LSP server (for IDE integration)
-                  --lsp.port <port>     LSP server port (default: 8123)
                   --inspect             Enable debugger
                   --inspect.port <p>    Debugger port (default: 4711)
                   --help, -h            Show this help
@@ -133,7 +124,6 @@ public class ReLangLauncher {
                   relang program.re                          Run a file
                   relang program.re --state-out state.json   Run with checkpointing
                   relang program.re --state-in state.json    Resume from checkpoint
-                  relang --lsp                               Start LSP server
                   relang --inspect prog.re                   Run with debugger
                   relang                                     Start REPL""");
     }

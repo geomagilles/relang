@@ -67,7 +67,7 @@ LSP provides code completion, diagnostics, and go-to-definition. This requires G
 
 In a terminal (from the project root):
 ```bash
-./gradlew :relang-core:run --args="--lsp"
+./gradlew :relang-lsp:run
 ```
 
 You should see:
@@ -151,6 +151,6 @@ relang-vscode/
 - Check the file has `.re` extension
 
 **LSP not connecting?**
-- Verify the LSP server is running: `./gradlew :relang-core:run --args="--lsp"`
+- Verify the LSP server is running: `./gradlew :relang-lsp:run`
 - Check the port setting matches (default: 8123)
 - Look at VS Code's Output panel → "ReLang Language Server"

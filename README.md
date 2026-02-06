@@ -116,6 +116,7 @@ fn  if  else  while  return  checkpoint  true  false
 ```
 relang/
 ├── relang-core/        # Language implementation (Truffle AST, parser, runtime)
+├── relang-lsp/         # Standalone LSP server launcher
 ├── relang-native/      # Native image build for `relang` interpreter
 ├── relang-compiler/    # Compiler (`relangc`) to produce native executables
 ├── relang-textmate/    # TextMate grammar for syntax highlighting
@@ -168,6 +169,12 @@ code .
 ./gradlew :relang-intellij:runIde
 ```
 
+### LSP Server
+
+```bash
+./gradlew :relang-lsp:run
+```
+
 Both IDEs support:
 - Syntax highlighting
 - LSP integration (code completion, diagnostics)
@@ -182,7 +189,6 @@ Options:
   --state-in <file>     Load execution state before running
   --state-out <file>    Save state when checkpoint is hit
   --state-format <fmt>  State format: json (default) | protobuf
-  --lsp                 Start LSP server (for IDE integration)
   --inspect             Enable Chrome DevTools debugger
   --help, -h            Show help
 

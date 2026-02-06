@@ -1,0 +1,17 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':relang-core')
+    implementation libs.graalvm.polyglot
+
+    runtimeOnly libs.graalvm.tools.lsp
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+application {
+    mainClass = 'com.relang.lsp.ReLangLspLauncher'
+}

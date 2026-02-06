@@ -44,9 +44,6 @@ This module contains:
 # Resume from checkpoint
 ./gradlew :relang-core:run --args="program.re --state-in state.json"
 
-# Start LSP server
-./gradlew :relang-core:run --args="--lsp"
-
 # Enable debugger
 ./gradlew :relang-core:run --args="--inspect program.re"
 ```
@@ -218,10 +215,10 @@ Sample programs are in `src/test/resources/samples/`:
 
 ## LSP Server
 
-The module includes an LSP server for IDE integration:
+LSP is provided by the dedicated `relang-lsp` module:
 
 ```bash
-./gradlew :relang-core:run --args="--lsp --lsp.port 8123"
+./gradlew :relang-lsp:run --args="--port 8123"
 ```
 
 Features:
