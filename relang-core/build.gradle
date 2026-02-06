@@ -33,6 +33,10 @@ protobuf {
     }
 }
 
+generateGrammarSource {
+    arguments += ['-visitor']
+}
+
 application {
     mainClass = 'com.relang.ReLangLauncher'
 }
