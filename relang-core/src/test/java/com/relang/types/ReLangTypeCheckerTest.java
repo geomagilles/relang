@@ -40,15 +40,15 @@ public class ReLangTypeCheckerTest {
     class ArithmeticTypeErrors {
 
         @Test
-        @DisplayName("Int + Float is a type error")
+        @DisplayName("Int + Float = Float (implicit widening)")
         void testIntPlusFloat() {
             var src = """
-                fn add(a: Int, b: Float): Int {
+                fn add(a: Int, b: Float): Float {
                     return a + b;
                 }
                 add(1, 2.0);
             """;
-            assertTypeError(src, "Operator '+'");
+            assertEval(src, 3.0);
         }
 
         @Test

@@ -20,6 +20,16 @@ public abstract class EqualsNode extends ReLangNode {
     }
 
     @Specialization
+    protected boolean equals(long left, double right) {
+        return left == right;
+    }
+
+    @Specialization
+    protected boolean equals(double left, long right) {
+        return left == right;
+    }
+
+    @Specialization
     protected boolean equals(double left, double right) {
         return left == right;
     }

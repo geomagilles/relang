@@ -390,6 +390,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     private ReLangType checkAdd(ReLangType left, ReLangType right, ReLangParser.ExprBinaryContext ctx) {
         if (left instanceof ReLangType.IntType && right instanceof ReLangType.IntType) return ReLangType.IntType.INSTANCE;
         if (left instanceof ReLangType.FloatType && right instanceof ReLangType.FloatType) return ReLangType.FloatType.INSTANCE;
+        if (left.isNumeric() && right.isNumeric()) return ReLangType.FloatType.INSTANCE;
         if (left instanceof ReLangType.StringType && right instanceof ReLangType.StringType) return ReLangType.StringType.INSTANCE;
         addError(ctx, "Operator '+' cannot be applied to " + left.displayName() + " and " + right.displayName());
         return ReLangType.UnknownType.INSTANCE;
@@ -398,6 +399,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     private ReLangType checkArithmetic(String op, ReLangType left, ReLangType right, ReLangParser.ExprBinaryContext ctx) {
         if (left instanceof ReLangType.IntType && right instanceof ReLangType.IntType) return ReLangType.IntType.INSTANCE;
         if (left instanceof ReLangType.FloatType && right instanceof ReLangType.FloatType) return ReLangType.FloatType.INSTANCE;
+        if (left.isNumeric() && right.isNumeric()) return ReLangType.FloatType.INSTANCE;
         addError(ctx, "Operator '" + op + "' cannot be applied to " + left.displayName() + " and " + right.displayName());
         return ReLangType.UnknownType.INSTANCE;
     }
@@ -411,6 +413,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     private ReLangType checkOrdering(String op, ReLangType left, ReLangType right, ReLangParser.ExprBinaryContext ctx) {
         if (left instanceof ReLangType.IntType && right instanceof ReLangType.IntType) return ReLangType.BoolType.INSTANCE;
         if (left instanceof ReLangType.FloatType && right instanceof ReLangType.FloatType) return ReLangType.BoolType.INSTANCE;
+        if (left.isNumeric() && right.isNumeric()) return ReLangType.BoolType.INSTANCE;
         addError(ctx, "Operator '" + op + "' cannot be applied to " + left.displayName() + " and " + right.displayName());
         return ReLangType.BoolType.INSTANCE;
     }
@@ -418,6 +421,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     private ReLangType checkEquality(String op, ReLangType left, ReLangType right, ReLangParser.ExprBinaryContext ctx) {
         if (left instanceof ReLangType.IntType && right instanceof ReLangType.IntType) return ReLangType.BoolType.INSTANCE;
         if (left instanceof ReLangType.FloatType && right instanceof ReLangType.FloatType) return ReLangType.BoolType.INSTANCE;
+        if (left.isNumeric() && right.isNumeric()) return ReLangType.BoolType.INSTANCE;
         if (left instanceof ReLangType.BoolType && right instanceof ReLangType.BoolType) return ReLangType.BoolType.INSTANCE;
         if (left instanceof ReLangType.StringType && right instanceof ReLangType.StringType) return ReLangType.BoolType.INSTANCE;
         addError(ctx, "Operator '" + op + "' cannot be applied to " + left.displayName() + " and " + right.displayName());

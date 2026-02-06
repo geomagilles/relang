@@ -1,5 +1,5 @@
 // Float primitive examples (spec section 2.2)
-// IEEE 754 64-bit double. No implicit coercion Int <-> Float.
+// IEEE 754 64-bit double. Implicit widening Int -> Float in mixed operations.
 
 // Literals
 let x = 3.14;

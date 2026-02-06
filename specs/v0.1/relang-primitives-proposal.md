@@ -53,7 +53,7 @@ let y: Float = -0.5
 let z: Float = 1.0e6
 ```
 
-Pas de coercion implicite `Int` <-> `Float`.
+Implicit widening: `Int` is promoted to `Float` in mixed-type operations (result is `Float`). Narrowing `Float` -> `Int` requires explicit `as`.
 
 ---
 

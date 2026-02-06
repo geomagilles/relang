@@ -28,11 +28,11 @@ ReLang operators are divided into categories:
 
 | Operator | Description | Types | Example |
 |----------|-------------|-------|---------|
-| `+` | Addition | `Int`, `Float` | `3 + 2` → `5` |
-| `-` | Subtraction | `Int`, `Float` | `5 - 2` → `3` |
-| `*` | Multiplication | `Int`, `Float` | `3 * 4` → `12` |
-| `/` | Division | `Int` (truncated), `Float` | `7 / 2` → `3` |
-| `%` | Remainder | `Int` | `7 % 3` → `1` |
+| `+` | Addition | `Int`, `Float`, mixed `Int`/`Float` → `Float` | `3 + 2` → `5`, `1 + 2.0` → `3.0` |
+| `-` | Subtraction | `Int`, `Float`, mixed `Int`/`Float` → `Float` | `5 - 2` → `3`, `5 - 2.0` → `3.0` |
+| `*` | Multiplication | `Int`, `Float`, mixed `Int`/`Float` → `Float` | `3 * 4` → `12`, `2 * 3.0` → `6.0` |
+| `/` | Division | `Int` (truncated), `Float`, mixed `Int`/`Float` → `Float` | `7 / 2` → `3`, `7 / 2.0` → `3.5` |
+| `%` | Remainder | `Int` only | `7 % 3` → `1` |
 
 ### 2.2 Unary Operators
 
@@ -77,7 +77,7 @@ ReLang operators are divided into categories:
 | `>=` | Greater than or equal | `a >= b` |
 
 **Comparison rules:**
-- Same-type comparison only (no implicit coercion)
+- Mixed `Int`/`Float` comparisons are allowed via implicit widening (`Int` promoted to `Float`)
 - Structural equality for composite types
 - See [Equality Semantics](relang-equality-proposal.md) for details
 

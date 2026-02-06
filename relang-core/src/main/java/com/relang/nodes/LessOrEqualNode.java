@@ -15,6 +15,16 @@ public abstract class LessOrEqualNode extends ReLangNode {
     }
 
     @Specialization
+    protected boolean lessOrEqual(long left, double right) {
+        return left <= right;
+    }
+
+    @Specialization
+    protected boolean lessOrEqual(double left, long right) {
+        return left <= right;
+    }
+
+    @Specialization
     protected boolean lessOrEqual(double left, double right) {
         return left <= right;
     }

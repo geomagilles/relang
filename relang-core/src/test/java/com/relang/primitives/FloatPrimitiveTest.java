@@ -1,7 +1,6 @@
 package com.relang.primitives;
 
 import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,12 +9,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for Float primitive type (spec section 2.2).
- * Float is an IEEE 754 64-bit double. No implicit coercion Int <-> Float.
+ * Float is an IEEE 754 64-bit double. Implicit widening Int -> Float in mixed operations.
  */
 @DisplayName("Float primitive")
 public class FloatPrimitiveTest {
@@ -245,34 +242,88 @@ public class FloatPrimitiveTest {
         }
     }
 
-    // --- No implicit coercion Int <-> Float ---
+    // --- Implicit widening Int -> Float ---
 
     @Nested
-    @DisplayName("No implicit coercion")
-    class NoCoercion {
+    @DisplayName("Implicit widening")
+    class ImplicitWidening {
 
         @Test
-        @DisplayName("Int + Float should fail (no implicit coercion)")
+        @DisplayName("Int + Float = Float: 1 + 2.0 -> 3.0")
         void testIntPlusFloat() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "1 + 2.0;"));
+            assertEval("1 + 2.0;", 3.0);
         }
 
         @Test
-        @DisplayName("Float + Int should fail (no implicit coercion)")
+        @DisplayName("Float + Int = Float: 1.0 + 2 -> 3.0")
         void testFloatPlusInt() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "1.0 + 2;"));
+            assertEval("1.0 + 2;", 3.0);
         }
 
         @Test
-        @DisplayName("Int * Float should fail (no implicit coercion)")
+        @DisplayName("Int * Float = Float: 2 * 3.0 -> 6.0")
         void testIntMulFloat() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "2 * 3.0;"));
+            assertEval("2 * 3.0;", 6.0);
         }
 
         @Test
-        @DisplayName("Int < Float should fail (no implicit coercion)")
+        @DisplayName("Int < Float: 1 < 2.0 -> true")
         void testIntLtFloat() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "1 < 2.0;"));
+            assertEval("1 < 2.0;", true);
+        }
+
+        @Test
+        @DisplayName("Int - Float = Float: 5 - 2.5 -> 2.5")
+        void testIntMinusFloat() {
+            assertEval("5 - 2.5;", 2.5);
+        }
+
+        @Test
+        @DisplayName("Float - Int = Float: 5.0 - 2 -> 3.0")
+        void testFloatMinusInt() {
+            assertEval("5.0 - 2;", 3.0);
+        }
+
+        @Test
+        @DisplayName("Int / Float = Float: 7 / 2.0 -> 3.5")
+        void testIntDivFloat() {
+            assertEval("7 / 2.0;", 3.5);
+        }
+
+        @Test
+        @DisplayName("Float / Int = Float: 7.0 / 2 -> 3.5")
+        void testFloatDivInt() {
+            assertEval("7.0 / 2;", 3.5);
+        }
+
+        @Test
+        @DisplayName("Float > Int: 2.0 > 1 -> true")
+        void testFloatGtInt() {
+            assertEval("2.0 > 1;", true);
+        }
+
+        @Test
+        @DisplayName("Int == Float: 1 == 1.0 -> true")
+        void testIntEqFloat() {
+            assertEval("1 == 1.0;", true);
+        }
+
+        @Test
+        @DisplayName("Int != Float: 1 != 2.0 -> true")
+        void testIntNeFloat() {
+            assertEval("1 != 2.0;", true);
+        }
+
+        @Test
+        @DisplayName("Mixed type in variable: let x = 1 + 2.5; x -> 3.5")
+        void testMixedInVariable() {
+            assertEval("let x = 1 + 2.5; x;", 3.5);
+        }
+
+        @Test
+        @DisplayName("Mixed type in function: fn f(a: Int, b: Float): Float = a + b")
+        void testMixedInFunction() {
+            assertEval("fn f(a: Int, b: Float): Float = a + b; f(1, 2.5);", 3.5);
         }
     }
 

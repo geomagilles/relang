@@ -15,6 +15,16 @@ public abstract class AddNode extends ReLangNode {
     }
 
     @Specialization
+    protected double add(long left, double right) {
+        return left + right;
+    }
+
+    @Specialization
+    protected double add(double left, long right) {
+        return left + right;
+    }
+
+    @Specialization
     protected double add(double left, double right) {
         return left + right;
     }

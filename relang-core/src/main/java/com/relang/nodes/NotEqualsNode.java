@@ -15,6 +15,16 @@ public abstract class NotEqualsNode extends ReLangNode {
     }
 
     @Specialization
+    protected boolean notEquals(long left, double right) {
+        return left != right;
+    }
+
+    @Specialization
+    protected boolean notEquals(double left, long right) {
+        return left != right;
+    }
+
+    @Specialization
     protected boolean notEquals(double left, double right) {
         return left != right;
     }

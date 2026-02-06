@@ -15,6 +15,16 @@ public abstract class DivNode extends ReLangNode {
     }
 
     @Specialization
+    protected double div(long left, double right) {
+        return left / right;
+    }
+
+    @Specialization
+    protected double div(double left, long right) {
+        return left / right;
+    }
+
+    @Specialization
     protected double div(double left, double right) {
         return left / right;
     }

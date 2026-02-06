@@ -1,7 +1,6 @@
 package com.relang.types;
 
 import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,12 +10,11 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for primitive type system behavior (spec sections 1-3).
- * Verifies type distinctions, no implicit coercion, and type safety.
+ * Verifies type distinctions, implicit Int->Float widening, and type safety.
  */
 @DisplayName("Primitive type system")
 public class PrimitiveTypeTest {
@@ -79,46 +77,46 @@ public class PrimitiveTypeTest {
         }
     }
 
-    // --- No implicit coercion ---
+    // --- Implicit widening Int -> Float ---
 
     @Nested
-    @DisplayName("No implicit coercion")
-    class NoImplicitCoercion {
+    @DisplayName("Implicit widening")
+    class ImplicitWidening {
 
         @Test
-        @DisplayName("Int + Float fails (no implicit coercion)")
+        @DisplayName("Int + Float = Float: 1 + 2.0 -> 3.0")
         void testIntPlusFloat() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "1 + 2.0;"));
+            assertEval("1 + 2.0;", 3.0);
         }
 
         @Test
-        @DisplayName("Float - Int fails (no implicit coercion)")
+        @DisplayName("Float - Int = Float: 1.0 - 2 -> -1.0")
         void testFloatMinusInt() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "1.0 - 2;"));
+            assertEval("1.0 - 2;", -1.0);
         }
 
         @Test
-        @DisplayName("Int * Float fails (no implicit coercion)")
+        @DisplayName("Int * Float = Float: 2 * 3.0 -> 6.0")
         void testIntTimesFloat() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "2 * 3.0;"));
+            assertEval("2 * 3.0;", 6.0);
         }
 
         @Test
-        @DisplayName("Int / Float fails (no implicit coercion)")
+        @DisplayName("Int / Float = Float: 10 / 2.0 -> 5.0")
         void testIntDivFloat() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "10 / 2.0;"));
+            assertEval("10 / 2.0;", 5.0);
         }
 
         @Test
-        @DisplayName("Int < Float fails (no implicit coercion)")
+        @DisplayName("Int < Float: 1 < 2.0 -> true")
         void testIntLtFloat() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "1 < 2.0;"));
+            assertEval("1 < 2.0;", true);
         }
 
         @Test
-        @DisplayName("Int == Float fails (no implicit coercion)")
+        @DisplayName("Int == Float: 1 == 1.0 -> true")
         void testIntEqFloat() {
-            assertThrows(PolyglotException.class, () -> context.eval("relang", "1 == 1.0;"));
+            assertEval("1 == 1.0;", true);
         }
     }
 
@@ -157,6 +155,11 @@ public class PrimitiveTypeTest {
     private void assertEval(String source, boolean expected) {
         Value result = context.eval("relang", source);
         assertEquals(expected, result.asBoolean());
+    }
+
+    private void assertEval(String source, double expected) {
+        Value result = context.eval("relang", source);
+        assertEquals(expected, result.asDouble(), 0.0001);
     }
 
     private void assertEval(String source, String expected) {

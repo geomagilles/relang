@@ -15,6 +15,16 @@ public abstract class GreaterOrEqualNode extends ReLangNode {
     }
 
     @Specialization
+    protected boolean greaterOrEqual(long left, double right) {
+        return left >= right;
+    }
+
+    @Specialization
+    protected boolean greaterOrEqual(double left, long right) {
+        return left >= right;
+    }
+
+    @Specialization
     protected boolean greaterOrEqual(double left, double right) {
         return left >= right;
     }

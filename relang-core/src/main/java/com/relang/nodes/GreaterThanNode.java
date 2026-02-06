@@ -15,6 +15,16 @@ public abstract class GreaterThanNode extends ReLangNode {
     }
 
     @Specialization
+    protected boolean greaterThan(long left, double right) {
+        return left > right;
+    }
+
+    @Specialization
+    protected boolean greaterThan(double left, long right) {
+        return left > right;
+    }
+
+    @Specialization
     protected boolean greaterThan(double left, double right) {
         return left > right;
     }

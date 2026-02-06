@@ -32,6 +32,8 @@ public sealed interface ReLangType
         if (this instanceof UnknownType || target instanceof UnknownType) return true;
         // NoneType is assignable to any type (ReLang allows none in any variable)
         if (this instanceof NoneType) return true;
+        // Implicit widening: Int is assignable to Float
+        if (this instanceof IntType && target instanceof FloatType) return true;
         if (target instanceof OptionalType opt) {
             return this.isAssignableTo(opt.inner());
         }

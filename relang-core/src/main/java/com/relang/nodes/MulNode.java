@@ -15,6 +15,16 @@ public abstract class MulNode extends ReLangNode {
     }
 
     @Specialization
+    protected double mul(long left, double right) {
+        return left * right;
+    }
+
+    @Specialization
+    protected double mul(double left, long right) {
+        return left * right;
+    }
+
+    @Specialization
     protected double mul(double left, double right) {
         return left * right;
     }
