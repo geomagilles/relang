@@ -622,27 +622,6 @@ public class ReLangTypeCheckerTest {
         }
 
         @Test
-        @DisplayName("Untyped parameters are rejected")
-        void testUntypedParamsRejected() {
-            assertTypeError("fn add(a, b) { return a + b; } add(3, 4);",
-                    "must have a type annotation");
-        }
-
-        @Test
-        @DisplayName("Bare assignment to undefined variable is rejected")
-        void testBareAssignmentRejected() {
-            assertTypeError("x = 10; x;", "Undefined variable");
-        }
-
-        @Test
-        @DisplayName("Recursive function without return type is rejected")
-        void testRecursiveNoReturnType() {
-            assertTypeError(
-                    "fn fac(n: Int) { if n < 2 { 1 } else { n * fac(n - 1) } } fac(5);",
-                    "Cannot infer return type for recursive function");
-        }
-
-        @Test
         @DisplayName("Recursive function with explicit return type works")
         void testRecursiveWithReturnType() {
             assertEval("fn fac(n: Int): Int { if n < 2 { 1 } else { n * fac(n - 1) } } fac(5);", 120);
@@ -738,12 +717,198 @@ public class ReLangTypeCheckerTest {
             """;
             assertEval(src, 5);
         }
+    }
+
+    // ================================================================
+    // 12. Missing type annotations
+    // ================================================================
+
+    @Nested
+    @DisplayName("Missing type annotations")
+    class MissingTypeAnnotations {
 
         @Test
-        @DisplayName("partially typed function is rejected")
-        void testPartiallyTyped() {
-            assertTypeError("fn add(a: Int, b) { return a + b; } add(3, 4);",
+        @DisplayName("Untyped parameters are rejected")
+        void testUntypedParams() {
+            assertTypeError("fn add(a, b) { return a + b; } add(1, 2);",
                     "must have a type annotation");
+        }
+
+        @Test
+        @DisplayName("Partially typed parameters are rejected")
+        void testPartiallyTypedParams() {
+            assertTypeError("fn add(a: Int, b) { return a + b; } add(1, 2);",
+                    "must have a type annotation");
+        }
+
+        @Test
+        @DisplayName("Untyped parameter with expression body is rejected")
+        void testUntypedExprBody() {
+            assertTypeError("fn f(x) = x; f(1);",
+                    "must have a type annotation");
+        }
+
+        @Test
+        @DisplayName("Multiple untyped parameters are rejected")
+        void testMultipleUntypedParams() {
+            assertTypeError("fn f(a, b, c) { return a; } f(1, 2, 3);",
+                    "must have a type annotation");
+        }
+    }
+
+    // ================================================================
+    // 13. Undefined variables
+    // ================================================================
+
+    @Nested
+    @DisplayName("Undefined variables")
+    class UndefinedVariables {
+
+        @Test
+        @DisplayName("Bare assignment to undefined variable is rejected")
+        void testBareAssignment() {
+            assertTypeError("x = 10; x;", "Undefined variable");
+        }
+
+        @Test
+        @DisplayName("Reading undefined variable is rejected")
+        void testReadUndefined() {
+            assertTypeError("let y = 1; x;", "Undefined variable");
+        }
+
+        @Test
+        @DisplayName("Undefined variable inside function is rejected")
+        void testUndefinedInFunction() {
+            assertTypeError("fn f(): Int { return x; } f();", "Undefined variable");
+        }
+
+        @Test
+        @DisplayName("Reference to undefined parameter is rejected")
+        void testUndefinedParameter() {
+            assertTypeError("fn f(a: Int): Int { return b; } f(1);", "Undefined variable");
+        }
+    }
+
+    // ================================================================
+    // 14. Return type inference errors
+    // ================================================================
+
+    @Nested
+    @DisplayName("Return type inference errors")
+    class ReturnTypeInferenceErrors {
+
+        @Test
+        @DisplayName("Self-recursive function without return type is rejected")
+        void testSelfRecursiveNoReturnType() {
+            assertTypeError(
+                    "fn fac(n: Int) { if n < 2 { 1 } else { n * fac(n - 1) } } fac(5);",
+                    "Cannot infer return type for recursive function");
+        }
+
+        @Test
+        @DisplayName("Return type inferred correctly for expression body")
+        void testInferredExprBody() {
+            assertEval("fn double(x: Int) = x * 2; double(5);", 10);
+        }
+
+        @Test
+        @DisplayName("Block body inferred correctly")
+        void testInferredBlockBody() {
+            assertEval("fn negate(b: Bool) { not b } negate(true);", false);
+        }
+
+        @Test
+        @DisplayName("Return statement vs declared type mismatch")
+        void testReturnStatementMismatch() {
+            var src = """
+                fn foo(): Int {
+                    return "hello";
+                }
+                foo();
+            """;
+            assertTypeError(src, "Return type mismatch");
+        }
+
+        @Test
+        @DisplayName("Expression body vs declared type mismatch")
+        void testExprBodyMismatch() {
+            assertTypeError("fn foo(): Bool = 42; foo();", "Return type mismatch");
+        }
+
+        @Test
+        @DisplayName("Inferred return type used in caller")
+        void testInferredTypeUsedByCaller() {
+            var src = """
+                fn getNum(x: Int) = x + 1;
+                fn check(x: Int): Bool = getNum(x) > 5;
+                check(10);
+            """;
+            assertEval(src, true);
+        }
+
+        @Test
+        @DisplayName("Multiple return paths must have same type")
+        void testMultipleReturnPathsMismatch() {
+            var src = """
+                fn f(x: Int): Int {
+                    if x > 0 {
+                        return "positive";
+                    } else {
+                        return -1;
+                    }
+                }
+                f(5);
+            """;
+            assertTypeError(src, "Return type mismatch");
+        }
+    }
+
+    // ================================================================
+    // 15. Variable reassignment errors
+    // ================================================================
+
+    @Nested
+    @DisplayName("Variable reassignment errors")
+    class VariableReassignmentErrors {
+
+        @Test
+        @DisplayName("Cannot reassign Bool variable to Int")
+        void testReassignBoolToInt() {
+            var src = """
+                fn f(): Int {
+                    let x = true;
+                    x = 42;
+                    return x;
+                }
+                f();
+            """;
+            assertTypeError(src, "Cannot assign Int to variable of type Bool");
+        }
+
+        @Test
+        @DisplayName("Cannot reassign none variable to Int")
+        void testReassignNoneToInt() {
+            assertTypeError("let x = none; x = 42; x;", "Cannot assign Int to variable of type None");
+        }
+
+        @Test
+        @DisplayName("Cannot reassign String variable to Int")
+        void testReassignStringToInt() {
+            assertTypeError("let x = \"hello\"; x = 42; x;", "Cannot assign Int to variable of type String");
+        }
+
+        @Test
+        @DisplayName("Cannot reassign Int variable to String in function context")
+        void testReassignIntToStringInFunction() {
+            var src = """
+                fn f(): String {
+                    let x = 1;
+                    x = "hello";
+                    return x;
+                }
+                f();
+            """;
+            assertTypeError(src, "Cannot assign String");
         }
     }
 
