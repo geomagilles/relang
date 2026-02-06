@@ -3,6 +3,7 @@ package com.relang.parser;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,11 +43,17 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     /** During return type inference, tracks the type seen in explicit return statements. */
     private ReLangType inferredReturnFromStatements = null;
 
+    /** Registry of user-declared types (both sealed markers and concrete record types). */
+    private final Map<String, UserTypeInfo> userTypes = new HashMap<>();
+
+    record UserTypeInfo(String name, String sealedParent, Map<String, ReLangType> fields) {}
+
     // ---- Inner classes ----
 
     private static class Scope {
         private final Scope parent;
         private final Map<String, ReLangType> variables = new HashMap<>();
+        private final Set<String> parameters = new HashSet<>();
 
         Scope(Scope parent) {
             this.parent = parent;
@@ -54,6 +61,11 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
         void define(String name, ReLangType type) {
             variables.put(name, type);
+        }
+
+        void defineParameter(String name, ReLangType type) {
+            variables.put(name, type);
+            parameters.add(name);
         }
 
         ReLangType lookup(String name) {
@@ -64,6 +76,12 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
         boolean isDefined(String name) {
             return lookup(name) != null;
+        }
+
+        boolean isParameter(String name) {
+            if (parameters.contains(name)) return true;
+            if (parent != null) return parent.isParameter(name);
+            return false;
         }
 
         /** Update an existing variable (walks up scope chain). Returns false if not found. */
@@ -98,6 +116,11 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
      * @return list of type errors (empty if code is well-typed)
      */
     public List<TypeError> check(ReLangParser.SourceContext tree) {
+        // Pass 0: collect user type declarations
+        for (var typeDecl : tree.typeDecl()) {
+            collectTypeDeclaration(typeDecl);
+        }
+
         // Pass 1: register builtins and collect function signatures
         registerBuiltins();
         for (var func : tree.function()) {
@@ -142,6 +165,100 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 0,
                 new ReLangType.AwaitableType(ReLangType.UnknownType.INSTANCE)
         ));
+        // now() -> Timestamp
+        functionSignatures.put("now", new FunctionSignature(
+                "now",
+                List.of(),
+                0,
+                ReLangType.TimestampType.INSTANCE
+        ));
+        // Failure(message: String) -> Failure
+        functionSignatures.put("Failure", new FunctionSignature(
+                "Failure",
+                List.of(new ParamSignature("message", ReLangType.StringType.INSTANCE)),
+                1,
+                ReLangType.FailureType.INSTANCE
+        ));
+        // json(text: String) -> Json
+        functionSignatures.put("json", new FunctionSignature(
+                "json",
+                List.of(new ParamSignature("text", ReLangType.StringType.INSTANCE)),
+                1,
+                ReLangType.JsonType.INSTANCE
+        ));
+    }
+
+    private void collectTypeDeclaration(ReLangParser.TypeDeclContext ctx) {
+        switch (ctx) {
+            case ReLangParser.DeclSealedContext sd -> {
+                var name = sd.ID().getText();
+                userTypes.put(name, new UserTypeInfo(name, null, Map.of()));
+            }
+            case ReLangParser.DeclTypeContext td -> {
+                var name = td.ID(0).getText();
+                String parent = td.ID().size() > 1 ? td.ID(1).getText() : null;
+                var fields = new LinkedHashMap<String, ReLangType>();
+                for (var field : td.fieldDecl()) {
+                    var fieldName = field.ID().getText();
+                    var fieldType = resolveType(field.typeRef());
+                    fields.put(fieldName, fieldType);
+                }
+                userTypes.put(name, new UserTypeInfo(name, parent, fields));
+            }
+            default -> {}
+        }
+    }
+
+    /**
+     * Resolve a typeRef to a ReLangType, including user-defined types.
+     * Replaces direct calls to {@code ReLangType.fromTypeRef()} in this checker.
+     */
+    private ReLangType resolveType(ReLangParser.TypeRefContext ctx) {
+        if (ctx == null) return ReLangType.UnknownType.INSTANCE;
+        return switch (ctx) {
+            case ReLangParser.TypeRefSimpleContext simple -> resolveTypeAtom(simple.typeRefAtom());
+            case ReLangParser.TypeRefProductContext product -> {
+                var components = new ArrayList<ReLangType>();
+                for (var atom : product.typeRefAtom()) {
+                    components.add(resolveTypeAtom(atom));
+                }
+                yield new ReLangType.ProductType(components);
+            }
+            case ReLangParser.TypeRefUnionContext union -> {
+                var alternatives = new ArrayList<ReLangType>();
+                for (var atom : union.typeRefAtom()) {
+                    alternatives.add(resolveTypeAtom(atom));
+                }
+                yield new ReLangType.UnionType(alternatives);
+            }
+            default -> ReLangType.UnknownType.INSTANCE;
+        };
+    }
+
+    private ReLangType resolveTypeAtom(ReLangParser.TypeRefAtomContext ctx) {
+        if (ctx == null) return ReLangType.UnknownType.INSTANCE;
+        var name = ctx.ID().getText();
+        boolean optional = ctx.getText().endsWith("?");
+        var base = switch (name) {
+            case "Int" -> ReLangType.IntType.INSTANCE;
+            case "Float" -> ReLangType.FloatType.INSTANCE;
+            case "Bool" -> ReLangType.BoolType.INSTANCE;
+            case "String" -> ReLangType.StringType.INSTANCE;
+            case "Unit" -> ReLangType.UnitType.INSTANCE;
+            case "None" -> ReLangType.NoneType.INSTANCE;
+            case "Bytes" -> ReLangType.BytesType.INSTANCE;
+            case "Duration" -> ReLangType.DurationType.INSTANCE;
+            case "Timestamp" -> ReLangType.TimestampType.INSTANCE;
+            case "Json" -> ReLangType.JsonType.INSTANCE;
+            case "Failure" -> ReLangType.FailureType.INSTANCE;
+            default -> {
+                if (userTypes.containsKey(name)) {
+                    yield new ReLangType.UserType(name);
+                }
+                yield ReLangType.UnknownType.INSTANCE;
+            }
+        };
+        return optional ? new ReLangType.OptionalType(base) : base;
     }
 
     private void collectFunctionSignature(ReLangParser.FunctionContext func) {
@@ -151,7 +268,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var params = collectParams(fb.typedParameters(), fb);
                 int requiredCount = countRequired(fb.typedParameters());
                 var returnType = fb.typeRef() != null
-                        ? ReLangType.fromTypeRef(fb.typeRef())
+                        ? resolveType(fb.typeRef())
                         : null; // null = needs inference
                 functionSignatures.put(name, new FunctionSignature(name, params, requiredCount, returnType));
             }
@@ -160,7 +277,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var params = collectParams(fe.typedParameters(), fe);
                 int requiredCount = countRequired(fe.typedParameters());
                 var returnType = fe.typeRef() != null
-                        ? ReLangType.fromTypeRef(fe.typeRef())
+                        ? resolveType(fe.typeRef())
                         : null; // null = needs inference
                 functionSignatures.put(name, new FunctionSignature(name, params, requiredCount, returnType));
             }
@@ -178,7 +295,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 addError(p, "Parameter '" + name + "' must have a type annotation");
                 result.add(new ParamSignature(name, ReLangType.UnknownType.INSTANCE));
             } else {
-                result.add(new ParamSignature(name, ReLangType.fromTypeRef(p.typeRef())));
+                result.add(new ParamSignature(name, resolveType(p.typeRef())));
             }
         }
         return result;
@@ -225,7 +342,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         // Set up function scope with param types
         var funcScope = new Scope(null);
         for (var p : sig.params()) {
-            funcScope.define(p.name(), p.type());
+            funcScope.defineParameter(p.name(), p.type());
         }
         var savedScope = currentScope;
         var savedReturn = currentFunctionReturnType;
@@ -264,7 +381,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var sig = functionSignatures.get(fb.ID().getText());
                 var funcScope = new Scope(null);
                 for (var p : sig.params()) {
-                    funcScope.define(p.name(), p.type());
+                    funcScope.defineParameter(p.name(), p.type());
                 }
                 var savedScope = currentScope;
                 var savedReturn = currentFunctionReturnType;
@@ -278,7 +395,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var sig = functionSignatures.get(fe.ID().getText());
                 var funcScope = new Scope(null);
                 for (var p : sig.params()) {
-                    funcScope.define(p.name(), p.type());
+                    funcScope.defineParameter(p.name(), p.type());
                 }
                 var savedScope = currentScope;
                 var savedReturn = currentFunctionReturnType;
@@ -326,6 +443,10 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
     @Override
     public ReLangType visitExprString(ReLangParser.ExprStringContext ctx) {
+        // Type-check any interpolated expressions inside the string
+        var raw = ctx.STRING().getText();
+        var inner = raw.substring(1, raw.length() - 1);
+        checkInterpolations(inner, ctx);
         return ReLangType.StringType.INSTANCE;
     }
 
@@ -337,6 +458,16 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     @Override
     public ReLangType visitExprUnit(ReLangParser.ExprUnitContext ctx) {
         return ReLangType.UnitType.INSTANCE;
+    }
+
+    @Override
+    public ReLangType visitExprDuration(ReLangParser.ExprDurationContext ctx) {
+        return ReLangType.DurationType.INSTANCE;
+    }
+
+    @Override
+    public ReLangType visitExprBytes(ReLangParser.ExprBytesContext ctx) {
+        return ReLangType.BytesType.INSTANCE;
     }
 
     // ---- Visitor overrides: Unary ----
@@ -424,6 +555,11 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (left.isNumeric() && right.isNumeric()) return ReLangType.BoolType.INSTANCE;
         if (left instanceof ReLangType.BoolType && right instanceof ReLangType.BoolType) return ReLangType.BoolType.INSTANCE;
         if (left instanceof ReLangType.StringType && right instanceof ReLangType.StringType) return ReLangType.BoolType.INSTANCE;
+        // Structural equality for user-defined record types (same type name)
+        if (left instanceof ReLangType.UserType utL && right instanceof ReLangType.UserType utR
+                && utL.name().equals(utR.name())) return ReLangType.BoolType.INSTANCE;
+        // Product equality
+        if (left instanceof ReLangType.ProductType && right instanceof ReLangType.ProductType) return ReLangType.BoolType.INSTANCE;
         addError(ctx, "Operator '" + op + "' cannot be applied to " + left.displayName() + " and " + right.displayName());
         return ReLangType.BoolType.INSTANCE;
     }
@@ -460,6 +596,27 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             addError(ctx, "Operator 'or' requires Bool operands, got " + right.displayName());
         }
         return ReLangType.BoolType.INSTANCE;
+    }
+
+    // ---- Visitor overrides: Product ----
+
+    @Override
+    public ReLangType visitExprProduct(ReLangParser.ExprProductContext ctx) {
+        var leftType = visit(ctx.left);
+        var rightType = visit(ctx.right);
+        // Flatten nested products
+        var components = new ArrayList<ReLangType>();
+        if (leftType instanceof ReLangType.ProductType lp) {
+            components.addAll(lp.components());
+        } else {
+            components.add(leftType);
+        }
+        if (rightType instanceof ReLangType.ProductType rp) {
+            components.addAll(rp.components());
+        } else {
+            components.add(rightType);
+        }
+        return new ReLangType.ProductType(components);
     }
 
     // ---- Visitor overrides: Variables ----
@@ -556,13 +713,80 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         return ReLangType.UnknownType.INSTANCE;
     }
 
+    // ---- Visitor overrides: Field access and construction ----
+
+    @Override
+    public ReLangType visitExprFieldAccess(ReLangParser.ExprFieldAccessContext ctx) {
+        var receiverType = visit(ctx.expr());
+        var fieldName = ctx.ID().getText();
+
+        if (receiverType instanceof ReLangType.UserType ut) {
+            var typeInfo = userTypes.get(ut.name());
+            if (typeInfo != null && typeInfo.fields().containsKey(fieldName)) {
+                return typeInfo.fields().get(fieldName);
+            }
+            addError(ctx, "No field '" + fieldName + "' in type " + ut.name());
+            return ReLangType.UnknownType.INSTANCE;
+        }
+        if (receiverType instanceof ReLangType.UnknownType) return ReLangType.UnknownType.INSTANCE;
+
+        addError(ctx, "Cannot access field '" + fieldName + "' on type " + receiverType.displayName());
+        return ReLangType.UnknownType.INSTANCE;
+    }
+
+    @Override
+    public ReLangType visitExprConstruct(ReLangParser.ExprConstructContext ctx) {
+        var typeName = ctx.ID().getText();
+        var typeInfo = userTypes.get(typeName);
+        if (typeInfo == null) {
+            addError(ctx, "Unknown type: " + typeName);
+            return ReLangType.UnknownType.INSTANCE;
+        }
+
+        // Check provided fields
+        var providedFields = new HashSet<String>();
+        for (var fi : ctx.fieldInit()) {
+            var fieldName = fi.ID().getText();
+            providedFields.add(fieldName);
+            var exprType = visit(fi.expr());
+
+            var expectedType = typeInfo.fields().get(fieldName);
+            if (expectedType == null) {
+                addError(fi, "Unknown field '" + fieldName + "' in type " + typeName);
+            } else if (!(exprType instanceof ReLangType.UnknownType) && !exprType.isAssignableTo(expectedType)) {
+                addError(fi, "Field '" + fieldName + "': expected " + expectedType.displayName()
+                        + " but got " + exprType.displayName());
+            }
+        }
+
+        // Check all required fields are provided
+        for (var requiredField : typeInfo.fields().keySet()) {
+            if (!providedFields.contains(requiredField)) {
+                addError(ctx, "Missing field '" + requiredField + "' in " + typeName + " construction");
+            }
+        }
+
+        return new ReLangType.UserType(typeName);
+    }
+
     // ---- Visitor overrides: Statements ----
 
     @Override
     public ReLangType visitStatementLet(ReLangParser.StatementLetContext ctx) {
         var rhsType = visit(ctx.expr());
         var varName = ctx.ID().getText();
-        currentScope.define(varName, rhsType);
+
+        if (ctx.typeRef() != null) {
+            var declaredType = resolveType(ctx.typeRef());
+            if (!(declaredType instanceof ReLangType.UnknownType) && !(rhsType instanceof ReLangType.UnknownType)) {
+                if (!rhsType.isAssignableTo(declaredType)) {
+                    addError(ctx, "Cannot assign " + rhsType.displayName() + " to variable of declared type " + declaredType.displayName());
+                }
+            }
+            currentScope.define(varName, declaredType);
+        } else {
+            currentScope.define(varName, rhsType);
+        }
         return ReLangType.UnitType.INSTANCE;
     }
 
@@ -576,6 +800,10 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (existingType == null) {
             addError(ctx, "Undefined variable '" + varName + "'");
         } else {
+            // Check parameter immutability
+            if (currentScope.isParameter(varName)) {
+                addError(ctx, "Cannot reassign parameter '" + varName + "'; parameters are immutable. Use 'let " + varName + " = ...' to shadow instead");
+            }
             // Check type compatibility
             if (!(existingType instanceof ReLangType.UnknownType) && !(rhsType instanceof ReLangType.UnknownType)) {
                 if (!rhsType.isAssignableTo(existingType)) {
@@ -821,6 +1049,46 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (b instanceof ReLangType.OptionalType optB && a.isAssignableTo(optB.inner())) return b;
         // Can't unify - return Unknown rather than erroring
         return ReLangType.UnknownType.INSTANCE;
+    }
+
+    /**
+     * Scan a string literal's inner content for ${...} interpolations and type-check each expression.
+     */
+    private void checkInterpolations(String inner, org.antlr.v4.runtime.ParserRuleContext parentCtx) {
+        int i = 0;
+        while (i < inner.length()) {
+            char c = inner.charAt(i);
+            if (c == '\\') {
+                i += 2; // skip escaped character
+            } else if (c == '$' && i + 1 < inner.length() && inner.charAt(i + 1) == '{') {
+                // Find matching closing brace
+                int braceDepth = 1;
+                int start = i + 2;
+                int j = start;
+                while (j < inner.length() && braceDepth > 0) {
+                    if (inner.charAt(j) == '{') braceDepth++;
+                    else if (inner.charAt(j) == '}') braceDepth--;
+                    if (braceDepth > 0) j++;
+                }
+                if (braceDepth != 0) {
+                    addError(parentCtx, "Unclosed interpolation in string");
+                    return;
+                }
+                // Parse and type-check the expression
+                var exprText = inner.substring(start, j);
+                try {
+                    var lexer = new ReLangLexer(org.antlr.v4.runtime.CharStreams.fromString(exprText));
+                    var parser = new ReLangParser(new org.antlr.v4.runtime.CommonTokenStream(lexer));
+                    var exprCtx = parser.expr();
+                    visit(exprCtx);
+                } catch (Exception e) {
+                    addError(parentCtx, "Invalid expression in string interpolation: " + exprText);
+                }
+                i = j + 1;
+            } else {
+                i++;
+            }
+        }
     }
 
     private void addError(org.antlr.v4.runtime.ParserRuleContext ctx, String message) {

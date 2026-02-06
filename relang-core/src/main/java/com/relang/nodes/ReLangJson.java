@@ -1,0 +1,26 @@
+package com.relang.nodes;
+
+import com.oracle.truffle.api.interop.TruffleObject;
+
+public final class ReLangJson implements TruffleObject {
+    private final String jsonText;
+
+    public ReLangJson(String jsonText) {
+        this.jsonText = jsonText;
+    }
+
+    public String getJsonText() { return jsonText; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ReLangJson other)) return false;
+        return jsonText.equals(other.jsonText);
+    }
+
+    @Override
+    public int hashCode() { return jsonText.hashCode(); }
+
+    @Override
+    public String toString() { return jsonText; }
+}

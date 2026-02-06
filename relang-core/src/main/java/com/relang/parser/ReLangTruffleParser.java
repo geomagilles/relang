@@ -43,6 +43,15 @@ import com.relang.nodes.ReLangContinueNode;
 import com.relang.nodes.ReLangForRangeNode;
 import com.relang.nodes.ReLangMatchNode;
 import com.relang.nodes.ReLangMatchSubjectlessNode;
+import com.relang.nodes.ToStringNodeGen;
+import com.relang.nodes.DurationLiteralNode;
+import com.relang.nodes.BytesLiteralNode;
+import com.relang.nodes.ReLangBuiltinNowNode;
+import com.relang.nodes.ReLangBuiltinFailureNode;
+import com.relang.nodes.ReLangBuiltinJsonNode;
+import com.relang.nodes.ReLangFieldAccessNode;
+import com.relang.nodes.ReLangConstructNode;
+import com.relang.nodes.ReLangProductNode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 
@@ -146,6 +155,15 @@ public class ReLangTruffleParser {
 
         var pendingRoot = new ReLangBuiltinPendingNode(language);
         functions.put("pending", new FunctionDescriptor(pendingRoot.getCallTarget(), List.of(), 0));
+
+        var nowRoot = new ReLangBuiltinNowNode(language);
+        functions.put("now", new FunctionDescriptor(nowRoot.getCallTarget(), List.of(), 0));
+
+        var failureRoot = new ReLangBuiltinFailureNode(language);
+        functions.put("Failure", new FunctionDescriptor(failureRoot.getCallTarget(), List.of("message"), 1));
+
+        var jsonRoot = new ReLangBuiltinJsonNode(language);
+        functions.put("json", new FunctionDescriptor(jsonRoot.getCallTarget(), List.of("text"), 1));
 
         return functions;
     }
@@ -259,7 +277,7 @@ public class ReLangTruffleParser {
             case ReLangParser.ExprBinaryContext bin -> parseBinaryExpr(context, bin);
             case ReLangParser.ExprIntContext intCtx -> new LongLiteralNode(Long.parseLong(intCtx.INT().getText().replace("_", "")));
             case ReLangParser.ExprFloatContext floatCtx -> new DoubleLiteralNode(Double.parseDouble(floatCtx.FLOAT().getText().replace("_", "")));
-            case ReLangParser.ExprStringContext strCtx -> new StringLiteralNode(processStringLiteral(strCtx.STRING().getText()));
+            case ReLangParser.ExprStringContext strCtx -> parseStringExpr(context, strCtx);
             case ReLangParser.ExprTrueContext ignored -> new BooleanLiteralNode(true);
             case ReLangParser.ExprFalseContext ignored -> new BooleanLiteralNode(false);
             case ReLangParser.ExprNoneContext ignored -> new NoneLiteralNode();
@@ -269,12 +287,17 @@ public class ReLangTruffleParser {
             case ReLangParser.ExprNotContext notCtx -> NotNodeGen.create(parseExpr(context, notCtx.expr()));
             case ReLangParser.ExprAndContext andCtx -> new LogicalAndNode(parseExpr(context, andCtx.left), parseExpr(context, andCtx.right));
             case ReLangParser.ExprOrContext orCtx -> new LogicalOrNode(parseExpr(context, orCtx.left), parseExpr(context, orCtx.right));
+            case ReLangParser.ExprProductContext prod -> new ReLangProductNode(parseExpr(context, prod.left), parseExpr(context, prod.right));
             case ReLangParser.ExprParenContext paren -> parseExpr(context, paren.expr());
             case ReLangParser.ExprIdContext id -> ReLangReadLocalVarNodeGen.create(context.getSlot(id.ID().getText()));
             case ReLangParser.ExprCallContext call -> parseCallExpr(context, call);
+            case ReLangParser.ExprFieldAccessContext fa -> new ReLangFieldAccessNode(parseExpr(context, fa.expr()), fa.ID().getText());
+            case ReLangParser.ExprConstructContext con -> parseConstructExpr(context, con);
             case ReLangParser.ExprIfElseContext ifElse -> parseIfElseExpr(context, ifElse);
             case ReLangParser.ExprMatchSubjectContext matchCtx -> parseMatchSubject(context, matchCtx);
             case ReLangParser.ExprMatchSubjectlessContext matchCtx -> parseMatchSubjectless(context, matchCtx);
+            case ReLangParser.ExprDurationContext durCtx -> parseDurationLiteral(durCtx);
+            case ReLangParser.ExprBytesContext bytesCtx -> parseBytesLiteral(bytesCtx);
             case null -> throw new IllegalArgumentException("Expression context cannot be null");
             default -> throw new IllegalArgumentException("Unknown expr type: " + ctx.getText());
         };
@@ -321,6 +344,19 @@ public class ReLangTruffleParser {
             }
         }
         return new ReLangInvokeNode(funcName, args.toArray(new ReLangNode[0]), argNames.toArray(new String[0]));
+    }
+
+    private static ReLangNode parseConstructExpr(ParseContext context, ReLangParser.ExprConstructContext con) {
+        var typeName = con.ID().getText();
+        var fieldNames = new ArrayList<String>();
+        var fieldValues = new ArrayList<ReLangNode>();
+        for (var fi : con.fieldInit()) {
+            fieldNames.add(fi.ID().getText());
+            fieldValues.add(parseExpr(context, fi.expr()));
+        }
+        return new ReLangConstructNode(typeName,
+                fieldNames.toArray(new String[0]),
+                fieldValues.toArray(new ReLangNode[0]));
     }
 
     private static ReLangNode parseIfNoParens(ParseContext context, ReLangParser.StatementIfNoParensContext ctx) {
@@ -419,6 +455,147 @@ public class ReLangTruffleParser {
         } else {
             return parseExpr(context, bodyCtx.expr());
         }
+    }
+
+    private static ReLangNode parseDurationLiteral(ReLangParser.ExprDurationContext ctx) {
+        var text = ctx.DURATION().getText();
+        long millis;
+        if (text.endsWith("ms")) {
+            millis = Long.parseLong(text.substring(0, text.length() - 2));
+        } else if (text.endsWith("min")) {
+            millis = Long.parseLong(text.substring(0, text.length() - 3)) * 60_000;
+        } else if (text.endsWith("h")) {
+            millis = Long.parseLong(text.substring(0, text.length() - 1)) * 3_600_000;
+        } else if (text.endsWith("s")) {
+            millis = Long.parseLong(text.substring(0, text.length() - 1)) * 1_000;
+        } else {
+            throw new RuntimeException("Invalid duration literal: " + text);
+        }
+        return new DurationLiteralNode(millis);
+    }
+
+    private static ReLangNode parseBytesLiteral(ReLangParser.ExprBytesContext ctx) {
+        var raw = ctx.BYTES_LITERAL().getText();
+        // Strip b" prefix and " suffix
+        var inner = raw.substring(2, raw.length() - 1);
+        var bytes = new java.io.ByteArrayOutputStream();
+        int i = 0;
+        while (i < inner.length()) {
+            if (inner.charAt(i) == '\\' && i + 1 < inner.length()) {
+                if (inner.charAt(i + 1) == 'x' && i + 3 < inner.length()) {
+                    var hex = inner.substring(i + 2, i + 4);
+                    bytes.write(Integer.parseInt(hex, 16));
+                    i += 4;
+                } else if (inner.charAt(i + 1) == '\\') {
+                    bytes.write('\\');
+                    i += 2;
+                } else if (inner.charAt(i + 1) == '"') {
+                    bytes.write('"');
+                    i += 2;
+                } else {
+                    bytes.write(inner.charAt(i));
+                    i++;
+                }
+            } else {
+                bytes.write(inner.charAt(i));
+                i++;
+            }
+        }
+        return new BytesLiteralNode(bytes.toByteArray());
+    }
+
+    private static ReLangNode parseStringExpr(ParseContext context, ReLangParser.ExprStringContext ctx) {
+        var raw = ctx.STRING().getText();
+        // Remove surrounding quotes
+        var inner = raw.substring(1, raw.length() - 1);
+
+        // Check if there are any interpolation expressions (unescaped ${)
+        if (!containsInterpolation(inner)) {
+            return new StringLiteralNode(processStringLiteral(raw));
+        }
+
+        // Parse interpolation segments
+        List<ReLangNode> segments = new ArrayList<>();
+        var sb = new StringBuilder();
+        int i = 0;
+        while (i < inner.length()) {
+            char c = inner.charAt(i);
+            if (c == '\\' && i + 1 < inner.length()) {
+                char next = inner.charAt(i + 1);
+                switch (next) {
+                    case 'n' -> { sb.append('\n'); i += 2; }
+                    case 't' -> { sb.append('\t'); i += 2; }
+                    case 'r' -> { sb.append('\r'); i += 2; }
+                    case '\\' -> { sb.append('\\'); i += 2; }
+                    case '"' -> { sb.append('"'); i += 2; }
+                    case '$' -> { sb.append('$'); i += 2; }
+                    default -> { sb.append(c); i++; }
+                }
+            } else if (c == '$' && i + 1 < inner.length() && inner.charAt(i + 1) == '{') {
+                // Flush text segment
+                if (!sb.isEmpty()) {
+                    segments.add(new StringLiteralNode(sb.toString()));
+                    sb.setLength(0);
+                }
+                // Find matching closing brace
+                int braceDepth = 1;
+                int start = i + 2;
+                int j = start;
+                while (j < inner.length() && braceDepth > 0) {
+                    if (inner.charAt(j) == '{') braceDepth++;
+                    else if (inner.charAt(j) == '}') braceDepth--;
+                    if (braceDepth > 0) j++;
+                }
+                if (braceDepth != 0) {
+                    throw new RuntimeException("Unclosed interpolation in string at position " + i);
+                }
+                // Parse the expression inside ${}
+                var exprText = inner.substring(start, j);
+                var lexer = new ReLangLexer(CharStreams.fromString(exprText));
+                var parser = new ReLangParser(new CommonTokenStream(lexer));
+                var exprCtx = parser.expr();
+                segments.add(parseExpr(context, exprCtx));
+                i = j + 1; // skip closing brace
+            } else {
+                sb.append(c);
+                i++;
+            }
+        }
+        // Flush remaining text
+        if (!sb.isEmpty()) {
+            segments.add(new StringLiteralNode(sb.toString()));
+        }
+
+        if (segments.isEmpty()) {
+            return new StringLiteralNode("");
+        }
+        if (segments.size() == 1) {
+            return segments.get(0);
+        }
+
+        // Build concatenation tree with toString conversion
+        ReLangNode result = ensureString(segments.get(0));
+        for (int k = 1; k < segments.size(); k++) {
+            result = AddNodeGen.create(result, ensureString(segments.get(k)));
+        }
+        return result;
+    }
+
+    private static boolean containsInterpolation(String inner) {
+        for (int i = 0; i < inner.length(); i++) {
+            char c = inner.charAt(i);
+            if (c == '\\') {
+                i++; // skip escaped character
+            } else if (c == '$' && i + 1 < inner.length() && inner.charAt(i + 1) == '{') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static ReLangNode ensureString(ReLangNode node) {
+        if (node instanceof StringLiteralNode) return node;
+        return ToStringNodeGen.create(node);
     }
 
     private static String processStringLiteral(String raw) {

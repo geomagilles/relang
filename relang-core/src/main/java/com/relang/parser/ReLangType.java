@@ -7,7 +7,11 @@ package com.relang.parser;
 public sealed interface ReLangType
         permits ReLangType.IntType, ReLangType.FloatType, ReLangType.BoolType,
                 ReLangType.StringType, ReLangType.UnitType, ReLangType.NoneType,
-                ReLangType.OptionalType, ReLangType.AwaitableType, ReLangType.UnknownType {
+                ReLangType.BytesType, ReLangType.DurationType, ReLangType.TimestampType,
+                ReLangType.JsonType, ReLangType.FailureType,
+                ReLangType.OptionalType, ReLangType.AwaitableType, ReLangType.UserType,
+                ReLangType.ProductType, ReLangType.UnionType,
+                ReLangType.UnknownType {
 
     /** Human-readable name: "Int", "Float?", "Awaitable<Int>", etc. */
     String displayName();
@@ -37,6 +41,18 @@ public sealed interface ReLangType
         if (target instanceof OptionalType opt) {
             return this.isAssignableTo(opt.inner());
         }
+        // T is assignable to T | U (union contains T)
+        if (target instanceof UnionType union) {
+            return union.alternatives().stream().anyMatch(this::isAssignableTo);
+        }
+        // Product A & B is assignable to Product A & B if components match pairwise
+        if (this instanceof ProductType thisProd && target instanceof ProductType targetProd) {
+            if (thisProd.components().size() != targetProd.components().size()) return false;
+            for (int i = 0; i < thisProd.components().size(); i++) {
+                if (!thisProd.components().get(i).isAssignableTo(targetProd.components().get(i))) return false;
+            }
+            return true;
+        }
         return false;
     }
 
@@ -53,6 +69,28 @@ public sealed interface ReLangType
      */
     static ReLangType fromTypeRef(ReLangParser.TypeRefContext ctx) {
         if (ctx == null) return UnknownType.INSTANCE;
+        return switch (ctx) {
+            case ReLangParser.TypeRefSimpleContext simple -> fromTypeRefAtom(simple.typeRefAtom());
+            case ReLangParser.TypeRefProductContext product -> {
+                var components = new java.util.ArrayList<ReLangType>();
+                for (var atom : product.typeRefAtom()) {
+                    components.add(fromTypeRefAtom(atom));
+                }
+                yield new ProductType(components);
+            }
+            case ReLangParser.TypeRefUnionContext union -> {
+                var alternatives = new java.util.ArrayList<ReLangType>();
+                for (var atom : union.typeRefAtom()) {
+                    alternatives.add(fromTypeRefAtom(atom));
+                }
+                yield new UnionType(alternatives);
+            }
+            default -> UnknownType.INSTANCE;
+        };
+    }
+
+    static ReLangType fromTypeRefAtom(ReLangParser.TypeRefAtomContext ctx) {
+        if (ctx == null) return UnknownType.INSTANCE;
         var name = ctx.ID().getText();
         boolean optional = ctx.getText().endsWith("?");
         var base = switch (name) {
@@ -62,6 +100,11 @@ public sealed interface ReLangType
             case "String" -> StringType.INSTANCE;
             case "Unit" -> UnitType.INSTANCE;
             case "None" -> NoneType.INSTANCE;
+            case "Bytes" -> BytesType.INSTANCE;
+            case "Duration" -> DurationType.INSTANCE;
+            case "Timestamp" -> TimestampType.INSTANCE;
+            case "Json" -> JsonType.INSTANCE;
+            case "Failure" -> FailureType.INSTANCE;
             default -> UnknownType.INSTANCE;
         };
         return optional ? new OptionalType(base) : base;
@@ -99,12 +142,53 @@ public sealed interface ReLangType
         @Override public String displayName() { return "None"; }
     }
 
+    record BytesType() implements ReLangType {
+        static final BytesType INSTANCE = new BytesType();
+        @Override public String displayName() { return "Bytes"; }
+    }
+
+    record DurationType() implements ReLangType {
+        static final DurationType INSTANCE = new DurationType();
+        @Override public String displayName() { return "Duration"; }
+    }
+
+    record TimestampType() implements ReLangType {
+        static final TimestampType INSTANCE = new TimestampType();
+        @Override public String displayName() { return "Timestamp"; }
+    }
+
+    record JsonType() implements ReLangType {
+        static final JsonType INSTANCE = new JsonType();
+        @Override public String displayName() { return "Json"; }
+    }
+
+    record FailureType() implements ReLangType {
+        static final FailureType INSTANCE = new FailureType();
+        @Override public String displayName() { return "Failure"; }
+    }
+
     record OptionalType(ReLangType inner) implements ReLangType {
         @Override public String displayName() { return inner.displayName() + "?"; }
     }
 
     record AwaitableType(ReLangType inner) implements ReLangType {
         @Override public String displayName() { return "Awaitable<" + inner.displayName() + ">"; }
+    }
+
+    record UserType(String name) implements ReLangType {
+        @Override public String displayName() { return name; }
+    }
+
+    record ProductType(java.util.List<ReLangType> components) implements ReLangType {
+        @Override public String displayName() {
+            return components.stream().map(ReLangType::displayName).collect(java.util.stream.Collectors.joining(" & "));
+        }
+    }
+
+    record UnionType(java.util.List<ReLangType> alternatives) implements ReLangType {
+        @Override public String displayName() {
+            return alternatives.stream().map(ReLangType::displayName).collect(java.util.stream.Collectors.joining(" | "));
+        }
     }
 
     record UnknownType() implements ReLangType {

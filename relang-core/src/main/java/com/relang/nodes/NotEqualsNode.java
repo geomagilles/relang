@@ -38,4 +38,22 @@ public abstract class NotEqualsNode extends ReLangNode {
     protected boolean notEquals(String left, String right) {
         return !left.equals(right);
     }
+
+    @Specialization(guards = "isRecord(left, right)")
+    protected boolean notEqualsRecord(Object left, Object right) {
+        return !left.equals(right);
+    }
+
+    @Specialization(guards = "isProduct(left, right)")
+    protected boolean notEqualsProduct(Object left, Object right) {
+        return !left.equals(right);
+    }
+
+    static boolean isRecord(Object left, Object right) {
+        return left instanceof ReLangRecord && right instanceof ReLangRecord;
+    }
+
+    static boolean isProduct(Object left, Object right) {
+        return left instanceof ReLangProduct && right instanceof ReLangProduct;
+    }
 }

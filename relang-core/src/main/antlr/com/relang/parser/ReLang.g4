@@ -6,7 +6,16 @@ package com.relang.parser;
 
 // Parser Rules
 source
-    : function* command* EOF
+    : typeDecl* function* command* EOF
+    ;
+
+typeDecl
+    : 'sealed' ID                                              # DeclSealed
+    | 'type' ID (':' ID)? '{' fieldDecl (',' fieldDecl)* ','? '}'  # DeclType
+    ;
+
+fieldDecl
+    : ID ':' typeRef
     ;
 
 function
@@ -23,6 +32,12 @@ typedParam
     ;
 
 typeRef
+    : typeRefAtom '&' typeRefAtom ('&' typeRefAtom)*           # TypeRefProduct
+    | typeRefAtom '|' typeRefAtom ('|' typeRefAtom)*           # TypeRefUnion
+    | typeRefAtom                                               # TypeRefSimple
+    ;
+
+typeRefAtom
     : ID '?'?
     ;
 
@@ -31,7 +46,7 @@ command
     ;
 
 statement
-    : 'let' ID '=' expr ';'                                    # StatementLet
+    : 'let' ID (':' typeRef)? '=' expr ';'                     # StatementLet
     | assignment ';'                                             # StatementAssignment
     | 'if' '(' expr ')' block ('else' block)?                   # StatementIf
     | 'if' expr block ('else' block)?                            # StatementIfNoParens
@@ -59,15 +74,18 @@ expr
     : 'await' expr                                               # ExprAwait
     | 'not' expr                                                 # ExprNot
     | '-' expr                                                   # ExprNegate
+    | expr '.' ID                                                # ExprFieldAccess
     | left=expr op=('*'|'/'|'%') right=expr                     # ExprBinary
     | left=expr op=('+'|'-') right=expr                          # ExprBinary
     | left=expr op=('<'|'<='|'>'|'>='|'=='|'!=') right=expr     # ExprBinary
     | left=expr 'and' right=expr                                 # ExprAnd
     | left=expr 'or' right=expr                                  # ExprOr
+    | left=expr '&' right=expr                                   # ExprProduct
     | 'if' expr block 'else' block                               # ExprIfElse
     | 'match' expr '{' matchArm (',' matchArm)* ','? '}'         # ExprMatchSubject
     | 'match' '{' matchArm (',' matchArm)* ','? '}'              # ExprMatchSubjectless
     | ID '(' callArguments? ')'                                   # ExprCall
+    | ID '{' fieldInit (',' fieldInit)* ','? '}'                 # ExprConstruct
     | ID                                                          # ExprId
     | INT                                                         # ExprInt
     | FLOAT                                                       # ExprFloat
@@ -76,6 +94,8 @@ expr
     | 'false'                                                     # ExprFalse
     | 'none'                                                      # ExprNone
     | 'unit'                                                      # ExprUnit
+    | DURATION                                                      # ExprDuration
+    | BYTES_LITERAL                                                 # ExprBytes
     | '(' expr ')'                                                # ExprParen
     ;
 
@@ -103,10 +123,17 @@ callArg
     | expr                                                        # CallArgPositional
     ;
 
+fieldInit
+    : ID ':' expr
+    ;
+
 // Lexer Rules
 FLOAT : [0-9] ([0-9_]* [0-9])? '.' [0-9] ([0-9_]* [0-9])? ([eE] [+-]? [0-9]+)?
       | [0-9] ([0-9_]* [0-9])? [eE] [+-]? [0-9]+
       ;
+DURATION : [0-9]+ ('ms' | 's' | 'min' | 'h') ;
+BYTES_LITERAL : 'b"' (BYTES_ESC | ~["\\])* '"' ;
+fragment BYTES_ESC : '\\' [\\"] | '\\x' [0-9a-fA-F] [0-9a-fA-F] ;
 INT   : [0-9] ([0-9_]* [0-9])? ;
 STRING : '"' (ESC | ~["\\])* '"' ;
 fragment ESC : '\\' [nrt\\"$] ;
