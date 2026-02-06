@@ -7,15 +7,20 @@ import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.ProvidedTags;
 import com.oracle.truffle.api.instrumentation.StandardTags;
+import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RootNode;
+import com.oracle.truffle.api.source.SourceSection;
 import com.relang.nodes.AwaitableTable;
 import com.relang.nodes.ReLangMetaType;
 import com.relang.nodes.ReLangSuspendException;
 import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
+import com.relang.parser.ReLangDiagnosticTruffleException;
+import com.relang.parser.ReLangSyntaxException;
+import com.relang.parser.ReLangTypeCheckException;
+import com.relang.parser.TypeError;
 
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @TruffleLanguage.Registration(id = "relang", name = "ReLang", defaultMimeType = "application/x-relang", characterMimeTypes = "application/x-relang")
 @ProvidedTags({StandardTags.ExpressionTag.class, StandardTags.StatementTag.class,
@@ -39,36 +44,29 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
 
     @Override
     protected CallTarget parse(ParsingRequest request) throws Exception {
-        String sourceCode = request.getSource().getCharacters().toString();
-        String sourceHash = ResumableState.computeSourceHash(sourceCode);
+        var lspRequest = LspDiagnosticsHelper.isLspRequest();
+        var sourceCode = request.getSource().getCharacters().toString();
+        var sourceHash = ResumableState.computeSourceHash(sourceCode);
 
         // Step 1: ANTLR parse
-        var tree = com.relang.parser.ReLangTruffleParser.parseAntlr(request.getSource());
+        final com.relang.parser.ReLangParser.SourceContext tree;
+        try {
+            tree = com.relang.parser.ReLangTruffleParser.parseAntlr(request.getSource());
+        } catch (ReLangSyntaxException syntaxException) {
+            if (lspRequest) {
+                throw toTruffleSyntaxError(request, syntaxException);
+            }
+            throw syntaxException;
+        }
 
         // Step 2: Type check
         var checker = new com.relang.parser.ReLangTypeChecker();
         var typeErrors = checker.check(tree);
         if (!typeErrors.isEmpty()) {
-            // Try to publish as LSP diagnostics (when running under LSP server)
-            try {
-                // Use reflection to avoid class loading issues when LSP is not available
-                Class<?> helperClass = Class.forName("com.relang.LspDiagnosticsHelper");
-                var method = helperClass.getMethod("buildDiagnosticsNotification",
-                        Object.class, Object.class);
-                throw (Exception) method.invoke(null, request.getSource().getURI(), typeErrors);
-            } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchMethodException e) {
-                // LSP tool not on classpath (CLI mode) — fall back to exception
-                throw new com.relang.parser.ReLangTypeCheckException(typeErrors);
-            } catch (java.lang.reflect.InvocationTargetException e) {
-                // Unwrap the actual exception thrown by buildDiagnosticsNotification
-                if (e.getCause() instanceof Exception cause) {
-                    throw cause;
-                }
-                throw new com.relang.parser.ReLangTypeCheckException(typeErrors);
-            } catch (IllegalAccessException e) {
-                // Shouldn't happen, but fall back to exception if it does
-                throw new com.relang.parser.ReLangTypeCheckException(typeErrors);
+            if (lspRequest) {
+                throw toTruffleTypeError(request, typeErrors);
             }
+            throw new ReLangTypeCheckException(typeErrors);
         }
 
         // Step 3: Build Truffle nodes
@@ -88,6 +86,62 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
 
         // Wrap in a top-level node that catches ReLangSuspendException
         return new TopLevelRootNode(this, entryDesc.callTarget()).getCallTarget();
+    }
+
+    private static RuntimeException toTruffleSyntaxError(ParsingRequest request, ReLangSyntaxException syntaxException) {
+        var firstError = syntaxException.getErrors().getFirst();
+        return toTruffleDiagnostic(request, firstError.line(), firstError.column(), firstError.sourceSnippet(), syntaxException.getMessage());
+    }
+
+    private static RuntimeException toTruffleTypeError(ParsingRequest request, java.util.List<TypeError> typeErrors) {
+        var firstError = typeErrors.getFirst();
+        var message = new ReLangTypeCheckException(typeErrors).getMessage();
+        return toTruffleDiagnostic(request, firstError.line(), firstError.column(), firstError.sourceSnippet(), message);
+    }
+
+    private static RuntimeException toTruffleDiagnostic(
+            ParsingRequest request,
+            int line,
+            int column,
+            String sourceSnippet,
+            String message
+    ) {
+        var section = sourceSectionFor(request, line, column, sourceSnippet);
+        return new ReLangDiagnosticTruffleException(message, new ErrorLocationNode(section));
+    }
+
+    private static SourceSection sourceSectionFor(ParsingRequest request, int line, int column, String sourceSnippet) {
+        var source = request.getSource();
+        var lineCount = source.getLineCount();
+        if (lineCount <= 0) {
+            return null;
+        }
+
+        var oneBasedLine = Math.max(1, Math.min(line, lineCount));
+        var lineStart = source.getLineStartOffset(oneBasedLine);
+        var lineLength = source.getLineLength(oneBasedLine);
+
+        var zeroBasedColumn = Math.max(0, column);
+        var startIndex = lineStart + Math.min(zeroBasedColumn, lineLength);
+        var length = Math.max(1, sourceSnippet != null ? sourceSnippet.length() : 1);
+        var maxLength = source.getLength() - startIndex;
+        if (maxLength <= 0) {
+            return null;
+        }
+        return source.createSection(startIndex, Math.min(length, maxLength));
+    }
+
+    private static final class ErrorLocationNode extends Node {
+        private final SourceSection sourceSection;
+
+        private ErrorLocationNode(SourceSection sourceSection) {
+            this.sourceSection = sourceSection;
+        }
+
+        @Override
+        public SourceSection getSourceSection() {
+            return sourceSection;
+        }
     }
 
     /**

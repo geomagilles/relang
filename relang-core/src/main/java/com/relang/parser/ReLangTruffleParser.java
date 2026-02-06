@@ -52,8 +52,12 @@ import com.relang.nodes.ReLangBuiltinJsonNode;
 import com.relang.nodes.ReLangFieldAccessNode;
 import com.relang.nodes.ReLangConstructNode;
 import com.relang.nodes.ReLangProductNode;
+import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
+import org.antlr.v4.runtime.Token;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -98,7 +102,36 @@ public class ReLangTruffleParser {
     public static ReLangParser.SourceContext parseAntlr(Source source) {
         var lexer = new ReLangLexer(CharStreams.fromString(source.getCharacters().toString()));
         var parser = new ReLangParser(new CommonTokenStream(lexer));
-        return parser.source();
+        var errors = new ArrayList<SyntaxError>();
+        var errorListener = new BaseErrorListener() {
+            @Override
+            public void syntaxError(
+                    Recognizer<?, ?> recognizer,
+                    Object offendingSymbol,
+                    int line,
+                    int charPositionInLine,
+                    String msg,
+                    RecognitionException e
+            ) {
+                var sourceSnippet = offendingSymbol instanceof Token token
+                        && token.getText() != null
+                        && !"<EOF>".equals(token.getText())
+                        ? token.getText()
+                        : null;
+                errors.add(new SyntaxError(line, charPositionInLine, msg, sourceSnippet));
+            }
+        };
+
+        lexer.removeErrorListeners();
+        parser.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        parser.addErrorListener(errorListener);
+
+        var tree = parser.source();
+        if (!errors.isEmpty()) {
+            throw new ReLangSyntaxException(errors);
+        }
+        return tree;
     }
 
     /**

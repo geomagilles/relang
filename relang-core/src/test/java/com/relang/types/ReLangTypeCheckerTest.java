@@ -757,6 +757,40 @@ public class ReLangTypeCheckerTest {
     }
 
     // ================================================================
+    // 12.5 Syntax vs type diagnostics precedence
+    // ================================================================
+
+    @Nested
+    @DisplayName("Syntax vs type diagnostics precedence")
+    class SyntaxVsTypeDiagnosticsPrecedence {
+
+        @Test
+        @DisplayName("Untyped parameter is reported when source is syntactically valid")
+        void testUntypedParameterReportedWhenSyntaxIsValid() {
+            var src = """
+                fn square(x: Int): Int = x * x
+                fn bas(x): Int = x * x
+                let r1 = square(6)
+            """;
+            assertTypeError(src, "must have a type annotation");
+        }
+
+        @Test
+        @DisplayName("Syntax error prevents later type-check diagnostics")
+        void testSyntaxErrorStopsTypeChecking() {
+            var src = """
+                fn square(x: Int): Int = x * x
+                fn bas(x): Int = x * x
+                let r1 = square(6)
+                fn oops(): Int = true
+            """;
+            var ex = assertSyntaxError(src, "extraneous input 'fn'");
+            assertTrue(!ex.getMessage().contains("must have a type annotation"),
+                    "Expected syntax-only diagnostics, but got: " + ex.getMessage());
+        }
+    }
+
+    // ================================================================
     // 13. Undefined variables
     // ================================================================
 
@@ -922,6 +956,15 @@ public class ReLangTypeCheckerTest {
                 "Expected TypeError in message but got: " + ex.getMessage());
         assertTrue(ex.getMessage().contains(expectedSubstring),
                 "Expected '" + expectedSubstring + "' in message but got: " + ex.getMessage());
+    }
+
+    private PolyglotException assertSyntaxError(String source, String expectedSubstring) {
+        var ex = assertThrows(PolyglotException.class, () -> context.eval("relang", source));
+        assertTrue(ex.getMessage().contains("SyntaxError"),
+                "Expected SyntaxError in message but got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains(expectedSubstring),
+                "Expected '" + expectedSubstring + "' in message but got: " + ex.getMessage());
+        return ex;
     }
 
     private void assertEval(String source, long expected) {
