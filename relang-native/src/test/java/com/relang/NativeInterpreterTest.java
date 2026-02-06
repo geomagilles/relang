@@ -151,7 +151,7 @@ public class NativeInterpreterTest {
     void testInlineProgram(@TempDir Path tempDir) throws Exception {
         // Create a temporary program file
         var program = tempDir.resolve("inline.re");
-        Files.writeString(program, "x = 42;");
+        Files.writeString(program, "let x = 42;");
 
         var result = runRelang(program);
 
@@ -163,10 +163,10 @@ public class NativeInterpreterTest {
     void testArithmeticOperations(@TempDir Path tempDir) throws Exception {
         var program = tempDir.resolve("arithmetic.re");
         Files.writeString(program, """
-                a = 10 + 5;
-                b = a * 2;
-                c = b - 3;
-                result = c / 3;
+                let a = 10 + 5;
+                let b = a * 2;
+                let c = b - 3;
+                let result = c / 3;
                 """);
 
         var result = runRelang(program);
@@ -180,13 +180,13 @@ public class NativeInterpreterTest {
     void testWhileLoop(@TempDir Path tempDir) throws Exception {
         var program = tempDir.resolve("loop.re");
         Files.writeString(program, """
-                sum = 0;
-                i = 1;
+                let sum = 0;
+                let i = 1;
                 while (i < 6) {
                     sum = sum + i;
                     i = i + 1;
                 }
-                result = sum;
+                let result = sum;
                 """);
 
         var result = runRelang(program);
@@ -200,7 +200,8 @@ public class NativeInterpreterTest {
     void testConditional(@TempDir Path tempDir) throws Exception {
         var program = tempDir.resolve("conditional.re");
         Files.writeString(program, """
-                x = 10;
+                let x = 10;
+                let result = 0;
                 if (x < 5) {
                     result = 1;
                 } else {
@@ -218,10 +219,10 @@ public class NativeInterpreterTest {
     void testFunctionDefinitionAndCall(@TempDir Path tempDir) throws Exception {
         var program = tempDir.resolve("function.re");
         Files.writeString(program, """
-                fn double(n) {
+                fn double(n: Int): Int {
                     return n * 2;
                 }
-                result = double(21);
+                let result = double(21);
                 """);
 
         var result = runRelang(program);
@@ -234,14 +235,14 @@ public class NativeInterpreterTest {
     void testRecursiveFunction(@TempDir Path tempDir) throws Exception {
         var program = tempDir.resolve("factorial.re");
         Files.writeString(program, """
-                fn factorial(n) {
+                fn factorial(n: Int): Int {
                     if (n < 2) {
                         return 1;
                     } else {
                         return n * factorial(n - 1);
                     }
                 }
-                result = factorial(5);
+                let result = factorial(5);
                 """);
 
         var result = runRelang(program);
