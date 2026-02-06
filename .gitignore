@@ -7,6 +7,7 @@ out/
 .vscode/
 .intellijPlatform/
 tmp/
+.kotlin/
 
 # VS Code extension
 relang-vscode/node_modules/

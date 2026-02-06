@@ -8,7 +8,8 @@
       {
         "id": "relang",
         "aliases": ["ReLang"],
-        "extensions": [".re"]
+        "extensions": [".re"],
+        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [

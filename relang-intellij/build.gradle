@@ -61,3 +61,19 @@ tasks.register('copyTextMateBundle', Copy) {
 tasks.named('processResources') {
     dependsOn 'copyTextMateBundle'
 }
+
+def enableSearchableOptions = project.findProperty('relang.buildSearchableOptions')
+    ?.toString()
+    ?.toBoolean() ?: false
+
+tasks.named('buildSearchableOptions') {
+    enabled = enableSearchableOptions
+}
+
+tasks.named('prepareJarSearchableOptions') {
+    enabled = enableSearchableOptions
+}
+
+tasks.named('jarSearchableOptions') {
+    enabled = enableSearchableOptions
+}

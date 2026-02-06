@@ -25,5 +25,11 @@
         <!-- TextMate grammar for syntax highlighting and file type -->
         <textmate.bundleProvider
             implementation="com.relang.intellij.ReLangTextMateBundleProvider"/>
+        <lang.foldingBuilder
+            language="textmate"
+            implementationClass="com.relang.intellij.ReLangFoldingBuilder"/>
+        <annotator
+            language="textmate"
+            implementationClass="com.relang.intellij.ReLangBraceAnnotator"/>
     </extensions>
 </idea-plugin>

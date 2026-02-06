@@ -39,6 +39,7 @@ class ReLangTextMateBundleProvider : TextMateBundleProvider {
 
             // Extract package.json to bundle root
             extractResource("/package.json", bundleDir.resolve("package.json"))
+            extractResource("/language-configuration.json", bundleDir.resolve("language-configuration.json"))
 
             // Extract grammar to syntaxes subfolder
             extractResource("/syntaxes/relang.tmLanguage.json", syntaxesDir.resolve("relang.tmLanguage.json"))
