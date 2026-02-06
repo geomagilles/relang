@@ -6,7 +6,7 @@ package com.relang.parser;
 
 // Parser Rules
 source
-    : typeDecl* function* command* EOF
+    : typeDecl* (function | command)* EOF
     ;
 
 typeDecl

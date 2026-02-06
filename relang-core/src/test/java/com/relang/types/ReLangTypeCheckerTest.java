@@ -3,15 +3,9 @@ package com.relang.types;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Comprehensive tests for the ReLang static type checker (Phase 1).
@@ -35,6 +29,67 @@ public class ReLangTypeCheckerTest {
     // 1. Arithmetic type errors
     // ================================================================
 
+    private void assertTypeError(String source, String expectedSubstring) {
+        var ex = assertThrows(PolyglotException.class, () -> context.eval("relang", source));
+        assertTrue(ex.getMessage().contains("TypeError"),
+                "Expected TypeError in message but got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains(expectedSubstring),
+                "Expected '" + expectedSubstring + "' in message but got: " + ex.getMessage());
+    }
+
+    // ================================================================
+    // 2. Modulo Int-only
+    // ================================================================
+
+    private PolyglotException assertSyntaxError(String source, String expectedSubstring) {
+        var ex = assertThrows(PolyglotException.class, () -> context.eval("relang", source));
+        assertTrue(ex.getMessage().contains("SyntaxError"),
+                "Expected SyntaxError in message but got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains(expectedSubstring),
+                "Expected '" + expectedSubstring + "' in message but got: " + ex.getMessage());
+        return ex;
+    }
+
+    // ================================================================
+    // 3. Condition must be Bool
+    // ================================================================
+
+    private void assertEval(String source, long expected) {
+        Value result = context.eval("relang", source);
+        assertEquals(expected, result.asLong());
+    }
+
+    // ================================================================
+    // 4. Logical operators require Bool
+    // ================================================================
+
+    private void assertEval(String source, double expected) {
+        Value result = context.eval("relang", source);
+        assertEquals(expected, result.asDouble(), 0.0001);
+    }
+
+    // ================================================================
+    // 5. Comparison type mismatch
+    // ================================================================
+
+    private void assertEval(String source, boolean expected) {
+        Value result = context.eval("relang", source);
+        assertEquals(expected, result.asBoolean());
+    }
+
+    // ================================================================
+    // 6. Negation type errors
+    // ================================================================
+
+    private void assertEval(String source, String expected) {
+        Value result = context.eval("relang", source);
+        assertEquals(expected, result.asString());
+    }
+
+    // ================================================================
+    // 7. Function call checks
+    // ================================================================
+
     @Nested
     @DisplayName("Arithmetic type errors")
     class ArithmeticTypeErrors {
@@ -43,11 +98,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Int + Float = Float (implicit widening)")
         void testIntPlusFloat() {
             var src = """
-                fn add(a: Int, b: Float): Float {
-                    return a + b;
-                }
-                add(1, 2.0);
-            """;
+                        fn add(a: Int, b: Float): Float {
+                            return a + b;
+                        }
+                        add(1, 2.0);
+                    """;
             assertEval(src, 3.0);
         }
 
@@ -55,11 +110,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("String - String is a type error")
         void testStringMinusString() {
             var src = """
-                fn sub(a: String, b: String): String {
-                    return a - b;
-                }
-                sub("a", "b");
-            """;
+                        fn sub(a: String, b: String): String {
+                            return a - b;
+                        }
+                        sub("a", "b");
+                    """;
             assertTypeError(src, "Operator '-'");
         }
 
@@ -67,11 +122,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Bool + Bool is a type error")
         void testBoolPlusBool() {
             var src = """
-                fn add(a: Bool, b: Bool): Bool {
-                    return a + b;
-                }
-                add(true, false);
-            """;
+                        fn add(a: Bool, b: Bool): Bool {
+                            return a + b;
+                        }
+                        add(true, false);
+                    """;
             assertTypeError(src, "Operator '+'");
         }
 
@@ -79,11 +134,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("String * Int is a type error")
         void testStringTimesInt() {
             var src = """
-                fn mul(a: String, b: Int): String {
-                    return a * b;
-                }
-                mul("x", 3);
-            """;
+                        fn mul(a: String, b: Int): String {
+                            return a * b;
+                        }
+                        mul("x", 3);
+                    """;
             assertTypeError(src, "Operator '*'");
         }
 
@@ -91,17 +146,17 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Bool / Bool is a type error")
         void testBoolDivBool() {
             var src = """
-                fn div(a: Bool, b: Bool): Bool {
-                    return a / b;
-                }
-                div(true, false);
-            """;
+                        fn div(a: Bool, b: Bool): Bool {
+                            return a / b;
+                        }
+                        div(true, false);
+                    """;
             assertTypeError(src, "Operator '/'");
         }
     }
 
     // ================================================================
-    // 2. Modulo Int-only
+    // 8. Return type mismatch
     // ================================================================
 
     @Nested
@@ -112,11 +167,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Float % Float is a type error")
         void testFloatModFloat() {
             var src = """
-                fn modf(a: Float, b: Float): Float {
-                    return a % b;
-                }
-                modf(3.14, 2.0);
-            """;
+                        fn modf(a: Float, b: Float): Float {
+                            return a % b;
+                        }
+                        modf(3.14, 2.0);
+                    """;
             assertTypeError(src, "Operator '%'");
         }
 
@@ -124,11 +179,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("String % Int is a type error")
         void testStringModInt() {
             var src = """
-                fn modf(a: String, b: Int): Int {
-                    return a % b;
-                }
-                modf("hello", 3);
-            """;
+                        fn modf(a: String, b: Int): Int {
+                            return a % b;
+                        }
+                        modf("hello", 3);
+                    """;
             assertTypeError(src, "Operator '%'");
         }
 
@@ -140,7 +195,7 @@ public class ReLangTypeCheckerTest {
     }
 
     // ================================================================
-    // 3. Condition must be Bool
+    // 9. Variable type mismatch on reassignment
     // ================================================================
 
     @Nested
@@ -197,7 +252,7 @@ public class ReLangTypeCheckerTest {
     }
 
     // ================================================================
-    // 4. Logical operators require Bool
+    // 10. For-range bounds must be Int
     // ================================================================
 
     @Nested
@@ -208,11 +263,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Int and Int is a type error")
         void testIntAndInt() {
             var src = """
-                fn f(a: Int, b: Int): Bool {
-                    return a and b;
-                }
-                f(1, 2);
-            """;
+                        fn f(a: Int, b: Int): Bool {
+                            return a and b;
+                        }
+                        f(1, 2);
+                    """;
             assertTypeError(src, "Operator 'and' requires Bool");
         }
 
@@ -220,11 +275,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("String or String is a type error")
         void testStringOrString() {
             var src = """
-                fn f(a: String, b: String): Bool {
-                    return a or b;
-                }
-                f("a", "b");
-            """;
+                        fn f(a: String, b: String): Bool {
+                            return a or b;
+                        }
+                        f("a", "b");
+                    """;
             assertTypeError(src, "Operator 'or' requires Bool");
         }
 
@@ -232,17 +287,17 @@ public class ReLangTypeCheckerTest {
         @DisplayName("not Int is a type error")
         void testNotInt() {
             var src = """
-                fn f(a: Int): Bool {
-                    return not a;
-                }
-                f(1);
-            """;
+                        fn f(a: Int): Bool {
+                            return not a;
+                        }
+                        f(1);
+                    """;
             assertTypeError(src, "Operator 'not' requires Bool");
         }
     }
 
     // ================================================================
-    // 5. Comparison type mismatch
+    // 11. Positive tests: all valid operations still work
     // ================================================================
 
     @Nested
@@ -253,11 +308,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Int < String is a type error")
         void testIntLessThanString() {
             var src = """
-                fn f(a: Int, b: String): Bool {
-                    return a < b;
-                }
-                f(1, "x");
-            """;
+                        fn f(a: Int, b: String): Bool {
+                            return a < b;
+                        }
+                        f(1, "x");
+                    """;
             assertTypeError(src, "Operator '<'");
         }
 
@@ -265,11 +320,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Bool < Int is a type error")
         void testBoolLessThanInt() {
             var src = """
-                fn f(a: Bool, b: Int): Bool {
-                    return a < b;
-                }
-                f(true, 1);
-            """;
+                        fn f(a: Bool, b: Int): Bool {
+                            return a < b;
+                        }
+                        f(true, 1);
+                    """;
             assertTypeError(src, "Operator '<'");
         }
 
@@ -277,11 +332,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Int == String is a type error")
         void testIntEqualsString() {
             var src = """
-                fn f(a: Int, b: String): Bool {
-                    return a == b;
-                }
-                f(1, "x");
-            """;
+                        fn f(a: Int, b: String): Bool {
+                            return a == b;
+                        }
+                        f(1, "x");
+                    """;
             assertTypeError(src, "Operator '=='");
         }
 
@@ -289,17 +344,17 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Float != Bool is a type error")
         void testFloatNotEqualsBool() {
             var src = """
-                fn f(a: Float, b: Bool): Bool {
-                    return a != b;
-                }
-                f(1.0, true);
-            """;
+                        fn f(a: Float, b: Bool): Bool {
+                            return a != b;
+                        }
+                        f(1.0, true);
+                    """;
             assertTypeError(src, "Operator '!='");
         }
     }
 
     // ================================================================
-    // 6. Negation type errors
+    // 12. Missing type annotations
     // ================================================================
 
     @Nested
@@ -310,11 +365,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("-\"hello\" is a type error")
         void testNegateString() {
             var src = """
-                fn f(s: String): String {
-                    return -s;
-                }
-                f("hello");
-            """;
+                        fn f(s: String): String {
+                            return -s;
+                        }
+                        f("hello");
+                    """;
             assertTypeError(src, "Cannot negate type String");
         }
 
@@ -322,11 +377,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("-true is a type error")
         void testNegateBool() {
             var src = """
-                fn f(b: Bool): Bool {
-                    return -b;
-                }
-                f(true);
-            """;
+                        fn f(b: Bool): Bool {
+                            return -b;
+                        }
+                        f(true);
+                    """;
             assertTypeError(src, "Cannot negate type Bool");
         }
 
@@ -344,7 +399,7 @@ public class ReLangTypeCheckerTest {
     }
 
     // ================================================================
-    // 7. Function call checks
+    // 12.5 Syntax vs type diagnostics precedence
     // ================================================================
 
     @Nested
@@ -355,9 +410,9 @@ public class ReLangTypeCheckerTest {
         @DisplayName("too few arguments")
         void testTooFewArgs() {
             var src = """
-                fn add(a: Int, b: Int): Int { return a + b; }
-                add(1);
-            """;
+                        fn add(a: Int, b: Int): Int { return a + b; }
+                        add(1);
+                    """;
             assertTypeError(src, "requires at least 2 arguments");
         }
 
@@ -365,9 +420,9 @@ public class ReLangTypeCheckerTest {
         @DisplayName("too many arguments")
         void testTooManyArgs() {
             var src = """
-                fn add(a: Int, b: Int): Int { return a + b; }
-                add(1, 2, 3);
-            """;
+                        fn add(a: Int, b: Int): Int { return a + b; }
+                        add(1, 2, 3);
+                    """;
             assertTypeError(src, "accepts at most 2 arguments");
         }
 
@@ -375,9 +430,9 @@ public class ReLangTypeCheckerTest {
         @DisplayName("wrong argument type")
         void testWrongArgType() {
             var src = """
-                fn double(x: Int): Int { return x * 2; }
-                double("hello");
-            """;
+                        fn double(x: Int): Int { return x * 2; }
+                        double("hello");
+                    """;
             assertTypeError(src, "expected Int but got String");
         }
 
@@ -391,17 +446,17 @@ public class ReLangTypeCheckerTest {
         @DisplayName("correct arity with defaults")
         void testCorrectArityWithDefaults() {
             var src = """
-                fn greet(name: String, greeting: String = "Hello"): String {
-                    return greeting + " " + name;
-                }
-                greet("Alice");
-            """;
+                        fn greet(name: String, greeting: String = "Hello"): String {
+                            return greeting + " " + name;
+                        }
+                        greet("Alice");
+                    """;
             assertEval(src, "Hello Alice");
         }
     }
 
     // ================================================================
-    // 8. Return type mismatch
+    // 13. Undefined variables
     // ================================================================
 
     @Nested
@@ -412,11 +467,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("function returns String instead of Int")
         void testReturnStringInsteadOfInt() {
             var src = """
-                fn foo(): Int {
-                    return "hello";
-                }
-                foo();
-            """;
+                        fn foo(): Int {
+                            return "hello";
+                        }
+                        foo();
+                    """;
             assertTypeError(src, "Return type mismatch");
         }
 
@@ -424,9 +479,9 @@ public class ReLangTypeCheckerTest {
         @DisplayName("expression body returns wrong type")
         void testExprBodyWrongType() {
             var src = """
-                fn foo(): Int = "hello";
-                foo();
-            """;
+                        fn foo(): Int = "hello";
+                        foo();
+                    """;
             assertTypeError(src, "Return type mismatch");
         }
 
@@ -438,7 +493,7 @@ public class ReLangTypeCheckerTest {
     }
 
     // ================================================================
-    // 9. Variable type mismatch on reassignment
+    // 14. Return type inference errors
     // ================================================================
 
     @Nested
@@ -449,13 +504,13 @@ public class ReLangTypeCheckerTest {
         @DisplayName("reassign Int variable to String")
         void testReassignIntToString() {
             var src = """
-                fn f(): Int {
-                    let x = 1;
-                    x = "hello";
-                    return x;
-                }
-                f();
-            """;
+                        fn f(): Int {
+                            let x = 1;
+                            x = "hello";
+                            return x;
+                        }
+                        f();
+                    """;
             assertTypeError(src, "Cannot assign String");
         }
 
@@ -470,17 +525,17 @@ public class ReLangTypeCheckerTest {
         void testReassignToNone() {
             // none is assignable to any type
             var src = """
-                let x = 42;
-                x = none;
-                x;
-            """;
+                        let x = 42;
+                        x = none;
+                        x;
+                    """;
             Value result = context.eval("relang", src);
             assertTrue(result.isNull());
         }
     }
 
     // ================================================================
-    // 10. For-range bounds must be Int
+    // 15. Variable reassignment errors
     // ================================================================
 
     @Nested
@@ -491,13 +546,13 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Bool bounds in for-range is an error")
         void testBoolBounds() {
             var src = """
-                fn f(a: Bool, b: Bool): Int {
-                    let sum = 0;
-                    for i in a..b { sum = sum + i; }
-                    return sum;
-                }
-                f(true, false);
-            """;
+                        fn f(a: Bool, b: Bool): Int {
+                            let sum = 0;
+                            for i in a..b { sum = sum + i; }
+                            return sum;
+                        }
+                        f(true, false);
+                    """;
             assertTypeError(src, "must be Int");
         }
 
@@ -505,13 +560,13 @@ public class ReLangTypeCheckerTest {
         @DisplayName("String bounds in for-range is an error")
         void testStringBounds() {
             var src = """
-                fn f(a: String, b: String): Int {
-                    let sum = 0;
-                    for i in a..b { sum = sum + i; }
-                    return sum;
-                }
-                f("a", "z");
-            """;
+                        fn f(a: String, b: String): Int {
+                            let sum = 0;
+                            for i in a..b { sum = sum + i; }
+                            return sum;
+                        }
+                        f("a", "z");
+                    """;
             assertTypeError(src, "must be Int");
         }
 
@@ -519,16 +574,16 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Int bounds in for-range is valid")
         void testIntBounds() {
             var src = """
-                let sum = 0;
-                for i in 0..5 { sum = sum + i; }
-                sum;
-            """;
+                        let sum = 0;
+                        for i in 0..5 { sum = sum + i; }
+                        sum;
+                    """;
             assertEval(src, 10);
         }
     }
 
     // ================================================================
-    // 11. Positive tests: all valid operations still work
+    // Helpers
     // ================================================================
 
     @Nested
@@ -649,14 +704,14 @@ public class ReLangTypeCheckerTest {
         @DisplayName("match expression works")
         void testMatchExpr() {
             var src = """
-                let x = 2;
-                let r = match x {
-                    1 -> "one",
-                    2 -> "two",
-                    _ -> "other"
-                };
-                r;
-            """;
+                        let x = 2;
+                        let r = match x {
+                            1 -> "one",
+                            2 -> "two",
+                            _ -> "other"
+                        };
+                        r;
+                    """;
             assertEval(src, "two");
         }
 
@@ -664,14 +719,14 @@ public class ReLangTypeCheckerTest {
         @DisplayName("subjectless match works")
         void testSubjectlessMatch() {
             var src = """
-                let score = 85;
-                let grade = match {
-                    score >= 90 -> "A",
-                    score >= 80 -> "B",
-                    _ -> "F"
-                };
-                grade;
-            """;
+                        let score = 85;
+                        let grade = match {
+                            score >= 90 -> "A",
+                            score >= 80 -> "B",
+                            _ -> "F"
+                        };
+                        grade;
+                    """;
             assertEval(src, "B");
         }
 
@@ -685,10 +740,10 @@ public class ReLangTypeCheckerTest {
         @DisplayName("for-range with Int bounds")
         void testForRange() {
             var src = """
-                let sum = 0;
-                for i in 1..=5 { sum = sum + i; }
-                sum;
-            """;
+                        let sum = 0;
+                        for i in 1..=5 { sum = sum + i; }
+                        sum;
+                    """;
             assertEval(src, 15);
         }
 
@@ -696,13 +751,13 @@ public class ReLangTypeCheckerTest {
         @DisplayName("break and continue in loops")
         void testBreakContinue() {
             var src = """
-                let sum = 0;
-                for i in 0..10 {
-                    if i == 5 { break; }
-                    sum = sum + i;
-                }
-                sum;
-            """;
+                        let sum = 0;
+                        for i in 0..10 {
+                            if i == 5 { break; }
+                            sum = sum + i;
+                        }
+                        sum;
+                    """;
             assertEval(src, 10);
         }
 
@@ -710,18 +765,14 @@ public class ReLangTypeCheckerTest {
         @DisplayName("optional type allows none")
         void testOptionalType() {
             var src = """
-                fn findOrNone(x: Int): Int? {
-                    if x > 0 { x } else { none }
-                }
-                findOrNone(5);
-            """;
+                        fn findOrNone(x: Int): Int? {
+                            if x > 0 { x } else { none }
+                        }
+                        findOrNone(5);
+                    """;
             assertEval(src, 5);
         }
     }
-
-    // ================================================================
-    // 12. Missing type annotations
-    // ================================================================
 
     @Nested
     @DisplayName("Missing type annotations")
@@ -756,10 +807,6 @@ public class ReLangTypeCheckerTest {
         }
     }
 
-    // ================================================================
-    // 12.5 Syntax vs type diagnostics precedence
-    // ================================================================
-
     @Nested
     @DisplayName("Syntax vs type diagnostics precedence")
     class SyntaxVsTypeDiagnosticsPrecedence {
@@ -768,10 +815,10 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Untyped parameter is reported when source is syntactically valid")
         void testUntypedParameterReportedWhenSyntaxIsValid() {
             var src = """
-                fn square(x: Int): Int = x * x
-                fn bas(x): Int = x * x
-                let r1 = square(6)
-            """;
+                        fn square(x: Int): Int = x * x
+                        fn bas(x): Int = x * x
+                        let r1 = square(6)
+                    """;
             assertTypeError(src, "must have a type annotation");
         }
 
@@ -779,20 +826,15 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Syntax error prevents later type-check diagnostics")
         void testSyntaxErrorStopsTypeChecking() {
             var src = """
-                fn square(x: Int): Int = x * x
-                fn bas(x): Int = x * x
-                let r1 = square(6)
-                fn oops(): Int = true
-            """;
-            var ex = assertSyntaxError(src, "extraneous input 'fn'");
-            assertTrue(!ex.getMessage().contains("must have a type annotation"),
-                    "Expected syntax-only diagnostics, but got: " + ex.getMessage());
+                        fn square(x: Int): Int = x * x
+                        fn bas(x): Int = x * x
+                        let r1 = square(6)
+                        let broken =
+                    """;
+            var ex = assertSyntaxError(src, "mismatched input '<EOF>'");
+            assertFalse(ex.getMessage().contains("must have a type annotation"), "Expected syntax-only diagnostics, but got: " + ex.getMessage());
         }
     }
-
-    // ================================================================
-    // 13. Undefined variables
-    // ================================================================
 
     @Nested
     @DisplayName("Undefined variables")
@@ -823,10 +865,6 @@ public class ReLangTypeCheckerTest {
         }
     }
 
-    // ================================================================
-    // 14. Return type inference errors
-    // ================================================================
-
     @Nested
     @DisplayName("Return type inference errors")
     class ReturnTypeInferenceErrors {
@@ -855,11 +893,11 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Return statement vs declared type mismatch")
         void testReturnStatementMismatch() {
             var src = """
-                fn foo(): Int {
-                    return "hello";
-                }
-                foo();
-            """;
+                        fn foo(): Int {
+                            return "hello";
+                        }
+                        foo();
+                    """;
             assertTypeError(src, "Return type mismatch");
         }
 
@@ -873,10 +911,10 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Inferred return type used in caller")
         void testInferredTypeUsedByCaller() {
             var src = """
-                fn getNum(x: Int) = x + 1;
-                fn check(x: Int): Bool = getNum(x) > 5;
-                check(10);
-            """;
+                        fn getNum(x: Int) = x + 1;
+                        fn check(x: Int): Bool = getNum(x) > 5;
+                        check(10);
+                    """;
             assertEval(src, true);
         }
 
@@ -884,22 +922,18 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Multiple return paths must have same type")
         void testMultipleReturnPathsMismatch() {
             var src = """
-                fn f(x: Int): Int {
-                    if x > 0 {
-                        return "positive";
-                    } else {
-                        return -1;
-                    }
-                }
-                f(5);
-            """;
+                        fn f(x: Int): Int {
+                            if x > 0 {
+                                return "positive";
+                            } else {
+                                return -1;
+                            }
+                        }
+                        f(5);
+                    """;
             assertTypeError(src, "Return type mismatch");
         }
     }
-
-    // ================================================================
-    // 15. Variable reassignment errors
-    // ================================================================
 
     @Nested
     @DisplayName("Variable reassignment errors")
@@ -909,13 +943,13 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Cannot reassign Bool variable to Int")
         void testReassignBoolToInt() {
             var src = """
-                fn f(): Int {
-                    let x = true;
-                    x = 42;
-                    return x;
-                }
-                f();
-            """;
+                        fn f(): Int {
+                            let x = true;
+                            x = 42;
+                            return x;
+                        }
+                        f();
+                    """;
             assertTypeError(src, "Cannot assign Int to variable of type Bool");
         }
 
@@ -935,55 +969,14 @@ public class ReLangTypeCheckerTest {
         @DisplayName("Cannot reassign Int variable to String in function context")
         void testReassignIntToStringInFunction() {
             var src = """
-                fn f(): String {
-                    let x = 1;
-                    x = "hello";
-                    return x;
-                }
-                f();
-            """;
+                        fn f(): String {
+                            let x = 1;
+                            x = "hello";
+                            return x;
+                        }
+                        f();
+                    """;
             assertTypeError(src, "Cannot assign String");
         }
-    }
-
-    // ================================================================
-    // Helpers
-    // ================================================================
-
-    private void assertTypeError(String source, String expectedSubstring) {
-        var ex = assertThrows(PolyglotException.class, () -> context.eval("relang", source));
-        assertTrue(ex.getMessage().contains("TypeError"),
-                "Expected TypeError in message but got: " + ex.getMessage());
-        assertTrue(ex.getMessage().contains(expectedSubstring),
-                "Expected '" + expectedSubstring + "' in message but got: " + ex.getMessage());
-    }
-
-    private PolyglotException assertSyntaxError(String source, String expectedSubstring) {
-        var ex = assertThrows(PolyglotException.class, () -> context.eval("relang", source));
-        assertTrue(ex.getMessage().contains("SyntaxError"),
-                "Expected SyntaxError in message but got: " + ex.getMessage());
-        assertTrue(ex.getMessage().contains(expectedSubstring),
-                "Expected '" + expectedSubstring + "' in message but got: " + ex.getMessage());
-        return ex;
-    }
-
-    private void assertEval(String source, long expected) {
-        Value result = context.eval("relang", source);
-        assertEquals(expected, result.asLong());
-    }
-
-    private void assertEval(String source, double expected) {
-        Value result = context.eval("relang", source);
-        assertEquals(expected, result.asDouble(), 0.0001);
-    }
-
-    private void assertEval(String source, boolean expected) {
-        Value result = context.eval("relang", source);
-        assertEquals(expected, result.asBoolean());
-    }
-
-    private void assertEval(String source, String expected) {
-        Value result = context.eval("relang", source);
-        assertEquals(expected, result.asString());
     }
 }

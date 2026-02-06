@@ -236,6 +236,17 @@ public class FunctionDeclarationTest {
             """;
             assertEval(src, 25); // 9 + 16
         }
+
+        @Test
+        @DisplayName("function declaration after top-level statement")
+        void testFunctionAfterTopLevelStatement() {
+            var src = """
+                let seed = 5;
+                fn square(x: Int): Int = x * x;
+                square(seed);
+            """;
+            assertEval(src, 25);
+        }
     }
 
     // --- Helpers ---
