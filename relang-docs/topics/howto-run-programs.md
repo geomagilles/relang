@@ -1,100 +1,50 @@
 # How to Run ReLang Programs
 
-This guide covers the different ways to execute ReLang programs.
+This guide describes how to run ReLang programs in this repository while staying aligned with `specs/v0.1`.
 
-## Running a File
+## 1. Run from Sources (Development)
 
-Execute a `.re` file:
-
-```bash
-relang myprogram.re
-```
-
-The result of the last expression is printed:
+From `/Users/gilles/dev/relang`:
 
 ```bash
-$ cat add.re
-1 + 2
-
-$ relang add.re
-Result: 3
+./gradlew :relang-core:run --args="path/to/program.re"
 ```
 
-## Using the REPL
+If your launcher differs, use the module README in `/Users/gilles/dev/relang/relang-core/README.md`.
 
-Start an interactive session:
+## 2. Structure Programs as Declarations
 
-```bash
-relang
+Per v0.1 modules:
+
+- one file is one module
+- top-level contains declarations (`type`, `sealed`, `fn`, `import`)
+- no executable top-level statements
+
+Use an explicit entry function (for example `main`).
+
+## 3. Write Effectful Code with Explicit Await
+
+```relang
+fn main(id: String): User | Failure {
+  let result = await http.get("https://api.example.com/users/" + id)
+  match result {
+    u: User -> u
+    f: Failure -> f
+  }
+}
 ```
 
-```
-ReLang REPL (type 'exit' to quit)
-================================
-relang> x = 10
-=> 10
-relang> x * 2
-=> 20
-relang> fn double(n) { return n * 2; }
-relang> double(21)
-=> 42
-relang> exit
-```
+## 4. Understand What Is Runtime-Defined
 
-## Running with the Debugger
+The language spec defines semantics, not a mandatory operational CLI contract for:
 
-Enable Chrome DevTools debugging:
+- debug ports
+- state file flags
+- wire format of persisted snapshots
 
-```bash
-relang --inspect myprogram.re
-```
-
-```
-Debugger listening on port 4711
-Connect Chrome DevTools to: chrome://inspect
-```
-
-Specify a custom port:
-
-```bash
-relang --inspect --inspect.port 9229 myprogram.re
-```
-
-## Running with Resumption
-
-See [How to Suspend and Resume Execution](how-to-suspend-resume.md) for details.
-
-```bash
-# Run with state persistence
-relang program.re --state-out state.json
-
-# Resume from saved state
-relang program.re --state-in state.json --state-out state.json
-```
-
-## Development vs Production
-
-### Development (JVM mode)
-
-```bash
-./gradlew run --args="myprogram.re"
-```
-
-- Slower startup (~500ms)
-- Faster peak performance (JIT compilation)
-- Full debugging support
-
-### Production (Native mode)
-
-```bash
-relang myprogram.re
-```
-
-- Fast startup (~50ms)
-- Lower memory usage
-- Self-contained binary
+Treat these as runtime/implementation concerns unless explicitly documented by the active launcher.
 
 ## See Also
 
-- [CLI Reference](reference-cli.md) - Complete command-line options
-- [Getting Started](tutorial-getting-started.md) - Installation and setup
+- [CLI Reference](reference-cli.md)
+- [Language Syntax Reference](reference-language-syntax.md)

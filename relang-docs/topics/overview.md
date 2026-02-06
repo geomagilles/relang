@@ -1,49 +1,52 @@
 # ReLang Documentation
 
-ReLang is a programming language built on GraalVM's Truffle framework with support for **resumable execution** via checkpoints.
+This documentation is aligned with the normative spec in `/Users/gilles/dev/relang/specs/v0.1/relang-spec-v0.1-canonique.md` and its companion `/Users/gilles/dev/relang/specs/v0.1/relang-failures-proposal.md`.
 
-## What is ReLang?
+## What ReLang v0.1 Is
 
-ReLang allows you to:
-- Write programs that can **suspend** at any point using `checkpoint;`
-- **Serialize** the complete execution state (call stack, local variables)
-- **Resume** execution later, even on a different machine
+ReLang v0.1 is a durable orchestration language:
 
-This makes ReLang ideal for:
-- Long-running computations that need to survive restarts
-- Workflow orchestration with durable execution
-- Debugging and time-travel scenarios
+- Effects are explicit and return awaitables (`*T`)
+- `await` is explicit (`await e`)
+- Runtime snapshots execution state at effect boundaries
+- Resume continues from the latest stable snapshot
+
+## Canonical Concepts
+
+- Awaitables: `*T`
+- Coordination: `and`, `or`
+- Optional values: `T?` with `none`
+- Failure contract: single `Failure` envelope with `FailureKind`
+- Function invocation modes: inline (`f(...)`) and distributed (`spawn f(...)`)
 
 ## Documentation Structure
 
-This documentation follows the [Diataxis](https://diataxis.fr) methodology:
+This module follows Diataxis:
 
-| Section | Purpose | When to use |
-|---------|---------|-------------|
-| **Tutorials** | Learning-oriented guides | You're new to ReLang |
-| **How-to Guides** | Task-oriented instructions | You need to accomplish something specific |
-| **Reference** | Technical specifications | You need precise details |
-| **Explanation** | Conceptual understanding | You want to understand how things work |
+- Tutorials: guided learning paths
+- How-to Guides: task-focused instructions
+- Reference: precise syntax/contracts
+- Explanation: conceptual internals and design rationale
 
-## Quick Example
+## Minimal Canonical Example
 
-```
-fn countdown(n) {
-    while (n > 0) {
-        checkpoint;  // Suspend here
-        n = n - 1;
-    }
-    return n;
+```relang
+type Order { id: String, total: Int }
+type Receipt { id: String }
+
+fn charge(order: Order): *Receipt {
+  payments.charge(order)
 }
 
-countdown(1000000);
+fn process(order: Order): Receipt | Failure {
+  let payment = await charge(order)
+  match payment {
+    r: Receipt -> r
+    f: Failure -> f
+  }
+}
 ```
 
-Run with state persistence:
-```bash
-relang countdown.re --state-out state.json
-# Suspends, saves state, exits
+## Source of Truth
 
-relang countdown.re --state-in state.json --state-out state.json
-# Resumes from where it left off
-```
+When a documentation page conflicts with implementation experiments or historical drafts, use `specs/v0.1` as source of truth.
