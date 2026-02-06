@@ -2,6 +2,7 @@ package com.relang.nodes;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.relang.proto.ResumableStateProtos.FrameStateProto;
 import com.relang.proto.ResumableStateProtos.LocalValue;
@@ -25,12 +26,13 @@ import java.util.Stack;
  *   <li>Protocol Buffers (toProto/fromProto)</li>
  * </ul>
  * <p>
- * Only {@code Long} and {@code Boolean} local variable types are supported.
+ * Supported local variable types: Long, Boolean, Double, String,
+ * ReLangNone, ReLangUnit, AwaitableHandle.
  */
 public final class FrameState implements Serializable {
 
     @Serial
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
 
     private final HashMap<String, Object> locals;
     private final ArrayList<Integer> executionPath;
@@ -38,7 +40,7 @@ public final class FrameState implements Serializable {
     /**
      * Creates a new FrameState from a map of locals and a path stack.
      *
-     * @param locals local variable values (only Long and Boolean supported)
+     * @param locals local variable values
      * @param path   execution path as a stack of block indices
      * @throws IllegalArgumentException if locals contain unsupported types
      */
@@ -52,7 +54,7 @@ public final class FrameState implements Serializable {
      * Creates a new FrameState from a map of locals and a path list.
      * Used for deserialization or direct construction.
      *
-     * @param locals local variable values (only Long and Boolean supported)
+     * @param locals local variable values
      * @param path   execution path as a list of block indices
      * @throws IllegalArgumentException if locals contain unsupported types
      */
@@ -64,13 +66,20 @@ public final class FrameState implements Serializable {
 
     private void validateAndCopyLocals(Map<String, Object> source) {
         for (var entry : source.entrySet()) {
-            Object value = entry.getValue();
-            if (value == null || value instanceof Long || value instanceof Boolean) {
+            var value = entry.getValue();
+            if (value == null
+                    || value instanceof Long
+                    || value instanceof Boolean
+                    || value instanceof Double
+                    || value instanceof String
+                    || value instanceof ReLangNone
+                    || value instanceof ReLangUnit
+                    || value instanceof AwaitableHandle) {
                 this.locals.put(entry.getKey(), value);
             } else {
                 throw new IllegalArgumentException(
                         "Local variable '" + entry.getKey() + "' has non-serializable type: "
-                                + value.getClass().getName() + ". Only Long and Boolean are supported.");
+                                + value.getClass().getName());
             }
         }
     }
@@ -108,7 +117,31 @@ public final class FrameState implements Serializable {
             switch (entry.getValue()) {
                 case Long l -> localsObj.addProperty(entry.getKey(), l);
                 case Boolean b -> localsObj.addProperty(entry.getKey(), b);
-                case null, default -> localsObj.add(entry.getKey(), null);
+                case Double d -> localsObj.addProperty(entry.getKey(), d);
+                case String s -> {
+                    var strMarker = new JsonObject();
+                    strMarker.addProperty("__type", "string");
+                    strMarker.addProperty("value", s);
+                    localsObj.add(entry.getKey(), strMarker);
+                }
+                case ReLangNone ignored -> {
+                    var noneMarker = new JsonObject();
+                    noneMarker.addProperty("__type", "none");
+                    localsObj.add(entry.getKey(), noneMarker);
+                }
+                case ReLangUnit ignored -> {
+                    var unitMarker = new JsonObject();
+                    unitMarker.addProperty("__type", "unit");
+                    localsObj.add(entry.getKey(), unitMarker);
+                }
+                case AwaitableHandle h -> {
+                    var handleObj = new JsonObject();
+                    handleObj.addProperty("__type", "awaitable");
+                    handleObj.addProperty("id", h.getId());
+                    localsObj.add(entry.getKey(), handleObj);
+                }
+                case null -> localsObj.add(entry.getKey(), JsonNull.INSTANCE);
+                default -> localsObj.add(entry.getKey(), JsonNull.INSTANCE);
             }
         }
         obj.add("locals", localsObj);
@@ -122,24 +155,63 @@ public final class FrameState implements Serializable {
         return obj;
     }
 
+    /**
+     * Deserialize from JSON without awaitable table (backward compatible).
+     */
     static FrameState fromJsonObject(JsonObject obj) {
-        Map<String, Object> locals = new HashMap<>();
-        JsonObject localsObj = obj.getAsJsonObject("locals");
+        return fromJsonObject(obj, null);
+    }
 
-        for (String key : localsObj.keySet()) {
-            JsonElement elem = localsObj.get(key);
+    /**
+     * Deserialize from JSON with optional awaitable table for resolving handle references.
+     */
+    static FrameState fromJsonObject(JsonObject obj, AwaitableTable awaitableTable) {
+        Map<String, Object> locals = new HashMap<>();
+        var localsObj = obj.getAsJsonObject("locals");
+
+        for (var key : localsObj.keySet()) {
+            var elem = localsObj.get(key);
             if (elem.isJsonNull()) {
                 locals.put(key, null);
+            } else if (elem.isJsonObject()) {
+                var objElem = elem.getAsJsonObject();
+                if (objElem.has("__type")) {
+                    var type = objElem.get("__type").getAsString();
+                    switch (type) {
+                        case "none" -> locals.put(key, ReLangNone.SINGLETON);
+                        case "unit" -> locals.put(key, ReLangUnit.SINGLETON);
+                        case "string" -> locals.put(key, objElem.get("value").getAsString());
+                        case "awaitable" -> {
+                            var handleId = objElem.get("id").getAsString();
+                            if (awaitableTable != null) {
+                                var handle = awaitableTable.get(handleId);
+                                if (handle != null) {
+                                    locals.put(key, handle);
+                                }
+                            }
+                            // If no table or handle not found, skip (will be null)
+                        }
+                        default -> locals.put(key, null);
+                    }
+                } else {
+                    locals.put(key, null);
+                }
             } else if (elem.getAsJsonPrimitive().isBoolean()) {
                 locals.put(key, elem.getAsBoolean());
             } else if (elem.getAsJsonPrimitive().isNumber()) {
-                locals.put(key, elem.getAsLong());
+                // Distinguish Long from Double: if the number has a decimal point, it's a Double
+                var numStr = elem.getAsJsonPrimitive().getAsString();
+                if (numStr.contains(".") || numStr.contains("e") || numStr.contains("E")) {
+                    locals.put(key, elem.getAsDouble());
+                } else {
+                    locals.put(key, elem.getAsLong());
+                }
             }
         }
 
         List<Integer> path = new ArrayList<>();
-        JsonArray pathArray = obj.getAsJsonArray("executionPath");
-        for (JsonElement elem : pathArray) {
+        var pathArray = obj.getAsJsonArray("executionPath");
+        for (var elem : pathArray) {
             path.add(elem.getAsInt());
         }
 
@@ -156,6 +228,11 @@ public final class FrameState implements Serializable {
             switch (entry.getValue()) {
                 case Long l -> valueBuilder.setLongValue(l);
                 case Boolean b -> valueBuilder.setBoolValue(b);
+                case Double d -> valueBuilder.setDoubleValue(d);
+                case String s -> valueBuilder.setStringValue(s);
+                case ReLangNone ignored -> valueBuilder.setNoneValue(true);
+                case ReLangUnit ignored -> valueBuilder.setUnitValue(true);
+                case AwaitableHandle h -> valueBuilder.setAwaitableRef(h.getId());
                 case null, default -> { /* empty LocalValue represents null */ }
             }
             builder.putLocals(entry.getKey(), valueBuilder.build());
@@ -168,17 +245,38 @@ public final class FrameState implements Serializable {
         return builder.build();
     }
 
+    /**
+     * Deserialize from protobuf without awaitable table (backward compatible).
+     */
     static FrameState fromProto(FrameStateProto proto) {
+        return fromProto(proto, null);
+    }
+
+    /**
+     * Deserialize from protobuf with optional awaitable table for resolving handle references.
+     */
+    static FrameState fromProto(FrameStateProto proto, AwaitableTable awaitableTable) {
         Map<String, Object> locals = new HashMap<>();
 
         for (var entry : proto.getLocalsMap().entrySet()) {
-            LocalValue value = entry.getValue();
-            if (value.hasLongValue()) {
-                locals.put(entry.getKey(), value.getLongValue());
-            } else if (value.hasBoolValue()) {
-                locals.put(entry.getKey(), value.getBoolValue());
-            } else {
-                locals.put(entry.getKey(), null);
+            var value = entry.getValue();
+            switch (value.getValueCase()) {
+                case LONG_VALUE -> locals.put(entry.getKey(), value.getLongValue());
+                case BOOL_VALUE -> locals.put(entry.getKey(), value.getBoolValue());
+                case DOUBLE_VALUE -> locals.put(entry.getKey(), value.getDoubleValue());
+                case STRING_VALUE -> locals.put(entry.getKey(), value.getStringValue());
+                case NONE_VALUE -> locals.put(entry.getKey(), ReLangNone.SINGLETON);
+                case UNIT_VALUE -> locals.put(entry.getKey(), ReLangUnit.SINGLETON);
+                case AWAITABLE_REF -> {
+                    var handleId = value.getAwaitableRef();
+                    if (awaitableTable != null) {
+                        var handle = awaitableTable.get(handleId);
+                        if (handle != null) {
+                            locals.put(entry.getKey(), handle);
+                        }
+                    }
+                }
+                default -> locals.put(entry.getKey(), null);
             }
         }
 

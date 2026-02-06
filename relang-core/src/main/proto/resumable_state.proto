@@ -5,11 +5,16 @@ package com.relang.proto;
 option java_package = "com.relang.proto";
 option java_outer_classname = "ResumableStateProtos";
 
-// A local variable value - can be either a long or a boolean
+// A local variable value - supports all ReLang value types
 message LocalValue {
   oneof value {
     int64 long_value = 1;
     bool bool_value = 2;
+    double double_value = 3;
+    string string_value = 4;
+    bool none_value = 5;      // true means none
+    bool unit_value = 6;      // true means unit
+    string awaitable_ref = 7; // reference to awaitable handle by id
   }
 }
 
@@ -17,9 +22,18 @@ message LocalValue {
 message FrameStateProto {
   // Local variables: name -> value
   map<string, LocalValue> locals = 1;
-  
+
   // Execution path indices (statement positions)
   repeated int32 execution_path = 2;
+}
+
+// An awaitable handle persisted in state
+message AwaitableHandleProto {
+  string id = 1;
+  int64 created_at = 2;
+  string status = 3;  // PENDING, RESOLVED, FAILED
+  // Result value (for resolved/failed awaitables)
+  optional LocalValue result = 4;
 }
 
 // The complete resumable state (call stack)
@@ -30,4 +44,10 @@ message ResumableStateProto {
 
   // Stack of frames (first = bottom, last = top)
   repeated FrameStateProto frames = 2;
+
+  // Awaitable table
+  map<string, AwaitableHandleProto> awaitables = 3;
+
+  // ID of the awaitable that caused the last suspension
+  optional string awaited_handle_id = 4;
 }

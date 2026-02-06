@@ -3,6 +3,7 @@ package com.relang;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.relang.nodes.AwaitableHandle;
 import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
 import com.relang.proto.ResumableStateProtos.FrameStateProto;
@@ -857,6 +858,268 @@ public class ReLangResumabilityTest {
         Value result2 = context.eval("relang", src);
 
         assertEquals(52, result2.asLong());
+    }
+
+    // ==================== S5: Awaitables & Await Tests ====================
+
+    @Test
+    void testAwaitPendingSuspends() {
+        String src = """
+                let x = 10;
+                let handle = pending();
+                let result = await handle;
+                x + result;
+                """;
+
+        // First run: should suspend on await of pending handle
+        Value result1 = context.eval("relang", src);
+        assertTrue(result1.isHostObject(), "Should suspend on pending await");
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Verify awaitable table and awaited handle ID
+        assertNotNull(suspended.state().getAwaitableTable(), "Should have awaitable table");
+        assertNotNull(suspended.state().getAwaitedHandleId(), "Should record awaited handle ID");
+
+        // Resolve the pending awaitable
+        String awaitedId = suspended.state().getAwaitedHandleId();
+        AwaitableHandle handle = suspended.state().getAwaitableTable().get(awaitedId);
+        assertNotNull(handle, "Handle should be in the table");
+        assertTrue(handle.isPending(), "Handle should be pending before resolve");
+        handle.resolve(42L);
+
+        // Resume
+        context.getPolyglotBindings().putMember("resumeState", suspended);
+        Value result2 = context.eval("relang", src);
+        assertEquals(52, result2.asLong()); // 10 + 42
+    }
+
+    @Test
+    void testAwaitResolvedDoesNotSuspend() {
+        String src = "await resolved(42);";
+        Value result = context.eval("relang", src);
+        assertFalse(result.isHostObject(), "Should NOT suspend on resolved await");
+        assertEquals(42, result.asLong());
+    }
+
+    @Test
+    void testMultipleAwaitsSequential() {
+        String src = """
+                let a = pending();
+                let b = pending();
+                let x = await a;
+                let y = await b;
+                x + y;
+                """;
+
+        // First suspension (await a)
+        Value result1 = context.eval("relang", src);
+        assertTrue(result1.isHostObject());
+        SuspendedResult suspended1 = result1.asHostObject();
+        suspended1.state().getAwaitableTable()
+                .get(suspended1.state().getAwaitedHandleId()).resolve(10L);
+
+        // Resume -> second suspension (await b)
+        context.getPolyglotBindings().putMember("resumeState", suspended1);
+        Value result2 = context.eval("relang", src);
+        assertTrue(result2.isHostObject());
+        SuspendedResult suspended2 = result2.asHostObject();
+        suspended2.state().getAwaitableTable()
+                .get(suspended2.state().getAwaitedHandleId()).resolve(20L);
+
+        // Resume -> completion
+        context.getPolyglotBindings().putMember("resumeState", suspended2);
+        Value result3 = context.eval("relang", src);
+        assertEquals(30, result3.asLong());
+    }
+
+    @Test
+    void testResolvedAwaitableNotReplayedOnResume() {
+        String src = """
+                let a = pending();
+                let x = await a;
+                let b = pending();
+                let y = await b;
+                x + y;
+                """;
+
+        // First suspension (await a)
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended1 = result1.asHostObject();
+        String awaitedId1 = suspended1.state().getAwaitedHandleId();
+        suspended1.state().getAwaitableTable().get(awaitedId1).resolve(100L);
+
+        // Resume -> hits await b (second suspension)
+        context.getPolyglotBindings().putMember("resumeState", suspended1);
+        Value result2 = context.eval("relang", src);
+        SuspendedResult suspended2 = result2.asHostObject();
+
+        // Verify 'a' is still resolved in the table (not re-created as pending)
+        AwaitableHandle handleA = null;
+        for (var h : suspended2.state().getAwaitableTable().getAll().values()) {
+            if (h.isResolved() && Long.valueOf(100L).equals(h.getResult())) {
+                handleA = h;
+                break;
+            }
+        }
+        assertNotNull(handleA, "Previously resolved awaitable should still be resolved");
+
+        // Resolve b and complete
+        suspended2.state().getAwaitableTable()
+                .get(suspended2.state().getAwaitedHandleId()).resolve(200L);
+        context.getPolyglotBindings().putMember("resumeState", suspended2);
+        Value result3 = context.eval("relang", src);
+        assertEquals(300, result3.asLong());
+    }
+
+    @Test
+    void testAwaitableTableJsonRoundTrip() {
+        String src = """
+                let h = pending();
+                let x = await h;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Resolve and serialize to JSON
+        suspended.state().getAwaitableTable()
+                .get(suspended.state().getAwaitedHandleId()).resolve(99L);
+        String json = suspended.toJson();
+
+        // Restore from JSON and resume
+        SuspendedResult restored = SuspendedResult.fromJson(json);
+        context.getPolyglotBindings().putMember("resumeState", restored);
+        Value result2 = context.eval("relang", src);
+        assertEquals(99, result2.asLong());
+    }
+
+    @Test
+    void testAwaitableTableProtoRoundTrip() throws Exception {
+        String src = """
+                let h = pending();
+                let x = await h;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Resolve and serialize to protobuf
+        suspended.state().getAwaitableTable()
+                .get(suspended.state().getAwaitedHandleId()).resolve(77L);
+        byte[] protoBytes = suspended.toProtoBytes();
+
+        // Restore from protobuf and resume
+        SuspendedResult restored = SuspendedResult.fromProtoBytes(protoBytes);
+        context.getPolyglotBindings().putMember("resumeState", restored);
+        Value result2 = context.eval("relang", src);
+        assertEquals(77, result2.asLong());
+    }
+
+    @Test
+    void testFrameStateWithNewTypes() {
+        // Verify FrameState can serialize Double, String, none
+        String src = """
+                let x = 3.14;
+                let s = "hello";
+                let n = none;
+                checkpoint;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        assertTrue(result1.isHostObject());
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Verify JSON round-trip
+        String json = suspended.toJson();
+        SuspendedResult restored = SuspendedResult.fromJson(json);
+        context.getPolyglotBindings().putMember("resumeState", restored);
+        Value result2 = context.eval("relang", src);
+        assertEquals(3.14, result2.asDouble(), 0.001);
+    }
+
+    @Test
+    void testFrameStateWithNewTypesProto() throws Exception {
+        String src = """
+                let x = 3.14;
+                let s = "hello";
+                let n = none;
+                checkpoint;
+                x;
+                """;
+
+        Value result1 = context.eval("relang", src);
+        assertTrue(result1.isHostObject());
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Verify protobuf round-trip
+        byte[] protoBytes = suspended.toProtoBytes();
+        SuspendedResult restored = SuspendedResult.fromProtoBytes(protoBytes);
+        context.getPolyglotBindings().putMember("resumeState", restored);
+        Value result2 = context.eval("relang", src);
+        assertEquals(3.14, result2.asDouble(), 0.001);
+    }
+
+    @Test
+    void testAwaitInNestedFunction() {
+        String src = """
+                fn inner() {
+                    let h = pending();
+                    return await h;
+                }
+                fn outer() {
+                    let x = 10;
+                    let result = inner();
+                    return x + result;
+                }
+                outer();
+                """;
+
+        // First run: suspends in inner() on pending await
+        Value result1 = context.eval("relang", src);
+        assertTrue(result1.isHostObject(), "Should suspend");
+        SuspendedResult suspended = result1.asHostObject();
+
+        // Resolve the awaitable
+        suspended.state().getAwaitableTable()
+                .get(suspended.state().getAwaitedHandleId()).resolve(5L);
+
+        // Resume -> should complete
+        context.getPolyglotBindings().putMember("resumeState", suspended);
+        Value result2 = context.eval("relang", src);
+        assertEquals(15, result2.asLong()); // 10 + 5
+    }
+
+    @Test
+    void testMixedCheckpointAndAwait() {
+        // A program with both a manual checkpoint and an await
+        String src = """
+                let x = 10;
+                checkpoint;
+                let h = pending();
+                let y = await h;
+                x + y;
+                """;
+
+        // First suspension: checkpoint
+        Value result1 = context.eval("relang", src);
+        assertTrue(result1.isHostObject(), "Should suspend at checkpoint");
+        SuspendedResult suspended1 = result1.asHostObject();
+
+        // Resume past checkpoint -> second suspension: await pending
+        context.getPolyglotBindings().putMember("resumeState", suspended1);
+        Value result2 = context.eval("relang", src);
+        assertTrue(result2.isHostObject(), "Should suspend at await");
+        SuspendedResult suspended2 = result2.asHostObject();
+
+        // Resolve and resume to completion
+        suspended2.state().getAwaitableTable()
+                .get(suspended2.state().getAwaitedHandleId()).resolve(20L);
+        context.getPolyglotBindings().putMember("resumeState", suspended2);
+        Value result3 = context.eval("relang", src);
+        assertEquals(30, result3.asLong()); // 10 + 20
     }
 
     @Test

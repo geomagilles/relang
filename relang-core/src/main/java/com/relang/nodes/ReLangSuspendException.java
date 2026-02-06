@@ -16,10 +16,13 @@ import java.util.List;
 public final class ReLangSuspendException extends ControlFlowException {
 
     private final ResumableState state;
-    
+
     // Temporary accumulator for path indices within the current frame during unwinding
     // Using ArrayList as a stack (add/remove from end)
     private final ArrayList<Integer> currentPath = new ArrayList<>();
+
+    // ID of the awaitable that caused suspension (null for manual checkpoint)
+    private String awaitedHandleId;
 
     public ReLangSuspendException() {
         this.state = new ResumableState();
@@ -27,6 +30,14 @@ public final class ReLangSuspendException extends ControlFlowException {
 
     public ResumableState getState() {
         return state;
+    }
+
+    public String getAwaitedHandleId() {
+        return awaitedHandleId;
+    }
+
+    public void setAwaitedHandleId(String id) {
+        this.awaitedHandleId = id;
     }
 
     /**
