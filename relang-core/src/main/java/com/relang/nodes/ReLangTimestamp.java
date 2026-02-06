@@ -1,8 +1,13 @@
 package com.relang.nodes;
 
+import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
+import com.oracle.truffle.api.library.ExportLibrary;
+import com.oracle.truffle.api.library.ExportMessage;
+
 import java.time.Instant;
 
+@ExportLibrary(InteropLibrary.class)
 public final class ReLangTimestamp implements TruffleObject {
     private final long epochMillis;
 
@@ -15,6 +20,21 @@ public final class ReLangTimestamp implements TruffleObject {
     }
 
     public long toEpochMillis() { return epochMillis; }
+
+    @ExportMessage
+    boolean hasMetaObject() {
+        return true;
+    }
+
+    @ExportMessage
+    Object getMetaObject() {
+        return ReLangMetaType.TIMESTAMP;
+    }
+
+    @ExportMessage
+    Object toDisplayString(@SuppressWarnings("unused") boolean allowSideEffects) {
+        return toString();
+    }
 
     @Override
     public boolean equals(Object o) {

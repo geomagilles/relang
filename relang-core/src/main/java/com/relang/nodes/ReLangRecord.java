@@ -60,6 +60,21 @@ public final class ReLangRecord implements TruffleObject {
         return fields.get(member);
     }
 
+    @ExportMessage
+    boolean hasMetaObject() {
+        return true;
+    }
+
+    @ExportMessage
+    Object getMetaObject() {
+        return new ReLangMetaType(typeName);
+    }
+
+    @ExportMessage
+    Object toDisplayString(@SuppressWarnings("unused") boolean allowSideEffects) {
+        return toString();
+    }
+
     // --- Structural equality ---
 
     @Override

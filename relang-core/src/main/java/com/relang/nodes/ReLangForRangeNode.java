@@ -1,6 +1,8 @@
 package com.relang.nodes;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.instrumentation.StandardTags;
+import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.NodeInfo;
 
 @NodeInfo(shortName = "for", description = "For loop over integer range")
@@ -18,6 +20,11 @@ public final class ReLangForRangeNode extends ReLangNode {
         this.bodyNode = bodyNode;
         this.varSlot = varSlot;
         this.inclusive = inclusive;
+    }
+
+    @Override
+    public boolean hasTag(Class<? extends Tag> tag) {
+        return tag == StandardTags.StatementTag.class;
     }
 
     @Override

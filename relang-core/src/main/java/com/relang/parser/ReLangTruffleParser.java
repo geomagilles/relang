@@ -65,6 +65,11 @@ public class ReLangTruffleParser {
     private static class ParseContext {
         final FrameDescriptor.Builder frameBuilder = FrameDescriptor.newBuilder();
         final Map<String, Integer> locals = new HashMap<>();
+        final Source source;
+
+        ParseContext(Source source) {
+            this.source = source;
+        }
 
         int getSlot(String name) {
             if (!locals.containsKey(name)) {
@@ -72,6 +77,15 @@ public class ReLangTruffleParser {
                 locals.put(name, slot);
             }
             return locals.get(name);
+        }
+
+        com.oracle.truffle.api.source.SourceSection sourceSection(org.antlr.v4.runtime.ParserRuleContext ctx) {
+            if (source == null || ctx == null || ctx.getStart() == null) return null;
+            int startIndex = ctx.getStart().getStartIndex();
+            int stopIndex = ctx.getStop() != null ? ctx.getStop().getStopIndex() : startIndex;
+            int length = stopIndex - startIndex + 1;
+            if (startIndex < 0 || length <= 0 || startIndex + length > source.getLength()) return null;
+            return source.createSection(startIndex, length);
         }
     }
 
@@ -90,7 +104,7 @@ public class ReLangTruffleParser {
     /**
      * Build Truffle nodes from a pre-parsed ANTLR tree.
      */
-    public static Map<String, FunctionDescriptor> buildTruffleNodes(ReLang language, ReLangParser.SourceContext tree) {
+    public static Map<String, FunctionDescriptor> buildTruffleNodes(ReLang language, ReLangParser.SourceContext tree, Source source) {
         Map<String, FunctionDescriptor> functions = new HashMap<>();
 
         // Parse functions first (hoisting)
@@ -98,7 +112,7 @@ public class ReLangTruffleParser {
             switch (funcCtx) {
                 case ReLangParser.FunctionBlockContext fb -> {
                     var functionName = fb.ID().getText();
-                    var context = new ParseContext();
+                    var context = new ParseContext(source);
                     var paramInfo = parseTypedParams(context, fb.typedParameters());
                     var body = parseBlock(context, fb.block());
 
@@ -116,7 +130,7 @@ public class ReLangTruffleParser {
                 }
                 case ReLangParser.FunctionExprContext fe -> {
                     var functionName = fe.ID().getText();
-                    var context = new ParseContext();
+                    var context = new ParseContext(source);
                     var paramInfo = parseTypedParams(context, fe.typedParameters());
                     var bodyExpr = parseExpr(context, fe.expr());
 
@@ -133,7 +147,7 @@ public class ReLangTruffleParser {
         }
 
         // Parse main body (top-level statements)
-        var mainContext = new ParseContext();
+        var mainContext = new ParseContext(source);
         List<ReLangNode> mainNodes = new ArrayList<>();
         if (tree.command().isEmpty()) {
             // If no main code, minimal dummy
@@ -173,7 +187,7 @@ public class ReLangTruffleParser {
      */
     public static Map<String, FunctionDescriptor> parse(ReLang language, Source source) {
         var tree = parseAntlr(source);
-        return buildTruffleNodes(language, tree);
+        return buildTruffleNodes(language, tree, source);
     }
 
     private static ParamInfo parseTypedParams(ParseContext context, ReLangParser.TypedParametersContext paramsCtx) {
@@ -210,16 +224,24 @@ public class ReLangTruffleParser {
         return new ParamInfo(names, setupNodes, requiredCount);
     }
 
+    /** Set source section on a node and return it, for chaining. */
+    private static ReLangNode withSourceSection(ParseContext context, org.antlr.v4.runtime.ParserRuleContext ruleCtx, ReLangNode node) {
+        var ss = context.sourceSection(ruleCtx);
+        if (ss != null) node.assignSourceSection(ss);
+        return node;
+    }
+
     private static ReLangNode parseBlock(ParseContext context, ReLangParser.BlockContext ctx) {
         List<ReLangNode> nodes = new ArrayList<>();
         for (var stmt : ctx.statement()) {
             nodes.add(parseStatement(context, stmt));
         }
-        return new ReLangBlockNode(nodes.toArray(new ReLangNode[0]));
+        var node = new ReLangBlockNode(nodes.toArray(new ReLangNode[0]));
+        return withSourceSection(context, ctx, node);
     }
 
     private static ReLangNode parseStatement(ParseContext context, ReLangParser.StatementContext ctx) {
-        return switch (ctx) {
+        var node = switch (ctx) {
             case ReLangParser.StatementExprContext s -> parseExpr(context, s.expr());
             case ReLangParser.StatementAssignmentContext s -> parseAssignment(context, s.assignment());
             case ReLangParser.StatementLetContext s -> parseLet(context, s);
@@ -236,6 +258,7 @@ public class ReLangTruffleParser {
             case null -> throw new IllegalArgumentException("Statement context cannot be null");
             default -> throw new IllegalArgumentException("Unknown statement type: " + ctx.getClass().getSimpleName());
         };
+        return withSourceSection(context, ctx, node);
     }
 
     private static ReLangNode parseLet(ParseContext context, ReLangParser.StatementLetContext ctx) {
@@ -269,7 +292,7 @@ public class ReLangTruffleParser {
     }
 
     private static ReLangNode parseExpr(ParseContext context, ReLangParser.ExprContext ctx) {
-        return switch (ctx) {
+        var node = switch (ctx) {
             case ReLangParser.ExprBinaryContext bin -> parseBinaryExpr(context, bin);
             case ReLangParser.ExprIntContext intCtx -> new LongLiteralNode(Long.parseLong(intCtx.INT().getText().replace("_", "")));
             case ReLangParser.ExprFloatContext floatCtx -> new DoubleLiteralNode(Double.parseDouble(floatCtx.FLOAT().getText().replace("_", "")));
@@ -297,6 +320,7 @@ public class ReLangTruffleParser {
             case null -> throw new IllegalArgumentException("Expression context cannot be null");
             default -> throw new IllegalArgumentException("Unknown expr type: " + ctx.getText());
         };
+        return withSourceSection(context, ctx, node);
     }
 
     private static ReLangNode parseBinaryExpr(ParseContext context, ReLangParser.ExprBinaryContext bin) {

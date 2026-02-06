@@ -2,6 +2,8 @@ package com.relang.nodes;
 
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.instrumentation.StandardTags;
+import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.RepeatingNode;
@@ -13,6 +15,11 @@ public final class ReLangWhileNode extends ReLangNode {
 
     public ReLangWhileNode(ReLangNode conditionNode, ReLangNode bodyNode) {
         this.loopNode = Truffle.getRuntime().createLoopNode(new ReLangRepeatingNode(conditionNode, bodyNode));
+    }
+
+    @Override
+    public boolean hasTag(Class<? extends Tag> tag) {
+        return tag == StandardTags.StatementTag.class;
     }
 
     @Override

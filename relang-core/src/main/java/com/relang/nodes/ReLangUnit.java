@@ -20,6 +20,16 @@ public final class ReLangUnit implements TruffleObject {
     }
 
     @ExportMessage
+    boolean hasMetaObject() {
+        return true;
+    }
+
+    @ExportMessage
+    Object getMetaObject() {
+        return ReLangMetaType.UNIT;
+    }
+
+    @ExportMessage
     Object toDisplayString(boolean allowSideEffects) {
         return "unit";
     }

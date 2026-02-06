@@ -27,44 +27,72 @@ The grammar uses the scope `source.relang` and defines highlighting for:
 
 | Token | Scope |
 |-------|-------|
-| `fn` | `keyword.control.function.relang` |
-| `if`, `else` | `keyword.control.conditional.relang` |
-| `while` | `keyword.control.loop.relang` |
-| `return` | `keyword.control.return.relang` |
-| `checkpoint` | `keyword.control.checkpoint.relang` |
-| `true`, `false` | `constant.language.boolean.relang` |
+| `if`, `else`, `while`, `return`, `for`, `in`, `match`, `await`, `break`, `continue` | `keyword.control.relang` |
+| `fn` | `keyword.declaration.function.relang` |
+| `let` | `keyword.declaration.relang` |
+| `type`, `sealed` | `keyword.declaration.type.relang` |
+| `checkpoint` | `keyword.other.checkpoint.relang` |
+
+### Type Names
+
+| Token | Scope |
+|-------|-------|
+| `Int`, `Float`, `Bool`, `String`, `Unit`, `None`, `Bytes`, `Duration`, `Timestamp`, `Json`, `Failure` | `support.type.relang` |
 
 ### Literals
 
 | Token | Scope |
 |-------|-------|
-| Numbers (`42`) | `constant.numeric.relang` |
-| Booleans | `constant.language.boolean.relang` |
+| Integers (`42`, `1_000`) | `constant.numeric.integer.relang` |
+| Floats (`3.14`, `1.0e10`) | `constant.numeric.float.relang` |
+| Durations (`5s`, `100ms`, `2h`, `10min`) | `constant.numeric.duration.relang` |
+| Strings (`"hello"`) | `string.quoted.double.relang` |
+| Bytes (`b"\x00\xff"`) | `string.quoted.other.bytes.relang` |
+| String interpolation (`${expr}`) | `meta.interpolation.relang` |
+| Escape sequences (`\n`, `\t`, `\"`, `\$`) | `constant.character.escape.relang` |
+| `true`, `false` | `constant.language.boolean.relang` |
+| `none`, `unit` | `constant.language.relang` |
+
+### Type Declarations
+
+| Pattern | Scope |
+|---------|-------|
+| `type Name` | type name → `entity.name.type.relang` |
+| `sealed Name` | type name → `entity.name.type.relang` |
 
 ### Identifiers
 
 | Context | Scope |
 |---------|-------|
-| Function name | `entity.name.function.relang` |
-| Function call | `entity.name.function.call.relang` |
+| Function definition (`fn foo(`) | `entity.name.function.relang` |
+| Function call (`foo(`) | `entity.name.function.call.relang` |
 | Variable | `variable.other.relang` |
 
 ### Operators
 
 | Token | Scope |
 |-------|-------|
-| `+`, `-`, `*`, `/` | `keyword.operator.arithmetic.relang` |
-| `<`, `==` | `keyword.operator.comparison.relang` |
+| `+`, `-`, `*`, `/`, `%` | `keyword.operator.arithmetic.relang` |
+| `==`, `!=`, `<`, `<=`, `>`, `>=` | `keyword.operator.comparison.relang` |
 | `=` | `keyword.operator.assignment.relang` |
+| `and`, `or`, `not` | `keyword.operator.logical.relang` |
+| `..`, `..=` | `keyword.operator.range.relang` |
+| `->` | `keyword.operator.arrow.relang` |
+| `&` | `keyword.operator.product.relang` |
+| `\|` | `keyword.operator.union.relang` |
 
 ### Punctuation
 
 | Token | Scope |
 |-------|-------|
-| `(`, `)` | `punctuation.parenthesis.relang` |
-| `{`, `}` | `punctuation.brace.relang` |
+| `(`, `)` | `punctuation.section.parens.relang` |
+| `{`, `}` | `punctuation.section.block.relang` |
+| `[`, `]` | `punctuation.section.brackets.relang` |
 | `,` | `punctuation.separator.comma.relang` |
-| `;` | `punctuation.terminator.relang` |
+| `:` | `punctuation.separator.colon.relang` |
+| `;` | `punctuation.terminator.statement.relang` |
+| `.` | `punctuation.accessor.relang` |
+| `_` | `constant.language.wildcard.relang` |
 
 ## Language Configuration
 
@@ -153,28 +181,38 @@ class ReLangTextMateBundleProvider : TextMateBundleProvider {
 ## Example Highlighting
 
 ```
-fn factorial(n) {        // 'fn' = keyword, 'factorial' = function name, 'n' = variable
-    if (n < 2) {         // 'if' = keyword, '<' = operator, '2' = number
-        return 1;        // 'return' = keyword, '1' = number
-    }
-    return n * factorial(n - 1);  // '*', '-' = operators, 'factorial' = function call
+type Person {                    // 'type' = keyword, 'Person' = type name
+    name: String                 // ':' = colon, 'String' = type name
+    age: Int                     // 'Int' = type name
 }
 
-result = factorial(5);   // '=' = assignment, 'result' = variable
-checkpoint;              // 'checkpoint' = keyword
+fn greet(p: Person): String {    // 'fn' = keyword, 'greet' = function name, ':' = return type
+    let msg = "Hello, ${p.name}" // 'let' = keyword, string with interpolation
+    return msg
+}
+
+let timeout = 5s                 // duration literal
+let data = b"\x48\x65\x6c\x6c"  // bytes literal
+
+for i in 0..10 {                 // 'for'/'in' = keywords, '..' = range operator
+    match i {                    // 'match' = keyword
+        0 -> "zero"             // '->' = match arrow
+        _ -> "other"            // '_' = wildcard
+    }
+}
+
+let result = 3.14 + 2.0         // float literals
+let check = true and not false   // 'and'/'not' = logical operators
 ```
 
 ## Extending the Grammar
 
 ### Adding a New Keyword
 
-1. Add to the keywords pattern in `relang.tmLanguage.json`:
-   ```json
-   {
-     "match": "\\b(fn|if|else|while|return|checkpoint|newkeyword)\\b",
-     "name": "keyword.control.relang"
-   }
-   ```
+1. Add to the appropriate keyword group in `relang.tmLanguage.json`:
+   - Control flow → `keyword.control.relang` pattern
+   - Declarations → `keyword.declaration.relang` pattern
+   - Logical operators → `keyword.operator.logical.relang` pattern
 
 2. Rebuild extensions:
    ```bash
@@ -182,17 +220,22 @@ checkpoint;              // 'checkpoint' = keyword
    ./gradlew :relang-intellij:build
    ```
 
-### Adding a New Scope
+### Pattern Ordering
 
-1. Define the pattern:
-   ```json
-   {
-     "match": "your-pattern-here",
-     "name": "your.scope.name.relang"
-   }
-   ```
+TextMate matches patterns top-to-bottom — more specific patterns **must** come first. The current order is:
 
-2. Place it in the appropriate position in the `patterns` array (order matters for precedence)
+1. Comments
+2. Strings (with interpolation)
+3. Type declarations (`type Name`, `sealed Name`)
+4. Keywords
+5. Type names (`Int`, `Float`, etc.)
+6. Functions (definitions before calls)
+7. Constants (floats before integers, durations, bytes, booleans, none/unit)
+8. Operators
+9. Punctuation
+10. Identifiers (catch-all)
+
+When adding new patterns, place them in the correct position. For example, a new literal type should go in section 7 (constants), and float patterns must precede integer patterns to avoid `3.14` matching as integer `3` followed by `.14`.
 
 ## TextMate Grammar Reference
 

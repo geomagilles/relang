@@ -1,7 +1,11 @@
 package com.relang.nodes;
 
+import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
+import com.oracle.truffle.api.library.ExportLibrary;
+import com.oracle.truffle.api.library.ExportMessage;
 
+@ExportLibrary(InteropLibrary.class)
 public final class ReLangFailure implements TruffleObject {
     private final String message;
 
@@ -10,6 +14,21 @@ public final class ReLangFailure implements TruffleObject {
     }
 
     public String getMessage() { return message; }
+
+    @ExportMessage
+    boolean hasMetaObject() {
+        return true;
+    }
+
+    @ExportMessage
+    Object getMetaObject() {
+        return ReLangMetaType.FAILURE;
+    }
+
+    @ExportMessage
+    Object toDisplayString(@SuppressWarnings("unused") boolean allowSideEffects) {
+        return toString();
+    }
 
     @Override
     public boolean equals(Object o) {

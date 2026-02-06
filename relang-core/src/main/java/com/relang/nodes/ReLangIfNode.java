@@ -1,6 +1,8 @@
 package com.relang.nodes;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.instrumentation.StandardTags;
+import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.profiles.ConditionProfile;
 
@@ -17,6 +19,11 @@ public final class ReLangIfNode extends ReLangNode {
         this.conditionNode = conditionNode;
         this.thenPartNode = thenPartNode;
         this.elsePartNode = elsePartNode;
+    }
+
+    @Override
+    public boolean hasTag(Class<? extends Tag> tag) {
+        return tag == StandardTags.StatementTag.class;
     }
 
     @Override

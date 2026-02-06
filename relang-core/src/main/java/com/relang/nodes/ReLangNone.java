@@ -19,6 +19,21 @@ public final class ReLangNone implements TruffleObject {
         return true;
     }
 
+    @ExportMessage
+    boolean hasMetaObject() {
+        return true;
+    }
+
+    @ExportMessage
+    Object getMetaObject() {
+        return ReLangMetaType.NONE;
+    }
+
+    @ExportMessage
+    Object toDisplayString(@SuppressWarnings("unused") boolean allowSideEffects) {
+        return "none";
+    }
+
     @Override
     public String toString() {
         return "none";

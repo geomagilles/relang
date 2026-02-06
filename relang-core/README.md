@@ -247,8 +247,38 @@ Features:
 
 3. If needed, update `ReLang.g4` and regenerate parser
 
-### Adding a New Type
+### Adding a New Runtime Type
 
-1. Update `ReLangTypeSystem` with the new type
-2. Add type checks in relevant nodes
-3. Update `ResumableState.FrameState` for serialization
+To add a new runtime type (e.g. `Regex`) that works with the LSP hover, debugger, and polyglot interop:
+
+1. **Create the type class** implementing `TruffleObject` with `@ExportLibrary(InteropLibrary.class)`:
+   ```java
+   @ExportLibrary(InteropLibrary.class)
+   public final class ReLangRegex implements TruffleObject {
+       // ... fields and methods ...
+
+       @ExportMessage boolean hasMetaObject() { return true; }
+       @ExportMessage Object getMetaObject() { return ReLangMetaType.REGEX; }
+       @ExportMessage Object toDisplayString(boolean allowSideEffects) { return toString(); }
+   }
+   ```
+
+2. **Register the meta type** in `ReLangMetaType.java`:
+   ```java
+   public static final ReLangMetaType REGEX = new ReLangMetaType("Regex");
+   ```
+   Also add a case to `isMetaInstance()`.
+
+3. **If the type maps to a Java primitive** (like `Long` → `Int`), add a case in `ReLang.getLanguageView()`:
+   ```java
+   if (value instanceof MyJavaPrimitive) return new ReLangLanguageView(value, ReLangMetaType.MY_TYPE);
+   ```
+
+4. **Update serialization** — add to `ResumableState.FrameState` if the type needs checkpoint support.
+
+Without steps 1-2, hovering over a value of the new type in VS Code / IntelliJ will show no type information.
+
+### GraalVM 25 API Notes
+
+- **`Node.setSourceSection()` was removed** in GraalVM 25. Source sections are stored in a `@CompilationFinal` field on `ReLangNode` and returned via an overridden `getSourceSection()`. See `ReLangNode.assignSourceSection()`.
+- **`TruffleLanguage.findLocalScopes()` was removed**. Variable scope for the debugger/LSP is provided by Truffle's default `NodeLibrary` which reads slot names from the `FrameDescriptor` automatically — no custom implementation needed as long as frame slots are named (which our parser does via `ParseContext.getSlot()`).

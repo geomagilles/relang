@@ -5,8 +5,11 @@ import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.instrumentation.ProvidedTags;
+import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.nodes.RootNode;
 import com.relang.nodes.AwaitableTable;
+import com.relang.nodes.ReLangMetaType;
 import com.relang.nodes.ReLangSuspendException;
 import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
@@ -15,11 +18,23 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @TruffleLanguage.Registration(id = "relang", name = "ReLang", defaultMimeType = "application/x-relang", characterMimeTypes = "application/x-relang")
+@ProvidedTags({StandardTags.ExpressionTag.class, StandardTags.StatementTag.class,
+               StandardTags.RootBodyTag.class, StandardTags.RootTag.class,
+               StandardTags.CallTag.class})
 public final class ReLang extends TruffleLanguage<ReLangContext> {
 
     @Override
     protected ReLangContext createContext(Env env) {
         return new ReLangContext(this, env);
+    }
+
+    @Override
+    protected Object getLanguageView(ReLangContext context, Object value) {
+        if (value instanceof Long) return new ReLangLanguageView(value, ReLangMetaType.INT);
+        if (value instanceof Double) return new ReLangLanguageView(value, ReLangMetaType.FLOAT);
+        if (value instanceof Boolean) return new ReLangLanguageView(value, ReLangMetaType.BOOL);
+        if (value instanceof String) return new ReLangLanguageView(value, ReLangMetaType.STRING);
+        return value;
     }
 
     @Override
@@ -57,7 +72,7 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
         }
 
         // Step 3: Build Truffle nodes
-        Map<String, FunctionDescriptor> functions = com.relang.parser.ReLangTruffleParser.buildTruffleNodes(this, tree);
+        Map<String, FunctionDescriptor> functions = com.relang.parser.ReLangTruffleParser.buildTruffleNodes(this, tree, request.getSource());
         ReLangContext context = ReLangContext.get(null);
         context.getFunctionRegistry().putAll(functions);
         context.setCurrentSourceHash(sourceHash);

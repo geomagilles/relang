@@ -3,6 +3,8 @@ package com.relang.nodes;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.instrumentation.StandardTags;
+import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.NodeInfo;
@@ -34,6 +36,11 @@ public final class ReLangInvokeNode extends ReLangNode {
     // Backward-compatible constructor (all positional)
     public ReLangInvokeNode(String functionName, ReLangNode[] argumentNodes) {
         this(functionName, argumentNodes, new String[argumentNodes.length]);
+    }
+
+    @Override
+    public boolean hasTag(Class<? extends Tag> tag) {
+        return tag == StandardTags.CallTag.class || tag == StandardTags.ExpressionTag.class;
     }
 
     @Override

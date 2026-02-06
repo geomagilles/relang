@@ -3,15 +3,9 @@ package com.relang.types;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests that if/while conditions only accept Bool values (issue #3).
@@ -33,6 +27,13 @@ public class BoolConditionTest {
     }
 
     // --- if rejects non-Bool ---
+
+    private void assertEval(String source, long expected) {
+        Value result = context.eval("relang", source);
+        assertEquals(expected, result.asLong());
+    }
+
+    // --- if accepts Bool ---
 
     @Nested
     @DisplayName("if rejects non-Bool conditions")
@@ -81,7 +82,7 @@ public class BoolConditionTest {
         }
     }
 
-    // --- if accepts Bool ---
+    // --- while rejects non-Bool ---
 
     @Nested
     @DisplayName("if accepts Bool conditions")
@@ -124,7 +125,7 @@ public class BoolConditionTest {
         }
     }
 
-    // --- while rejects non-Bool ---
+    // --- while accepts Bool ---
 
     @Nested
     @DisplayName("while rejects non-Bool conditions")
@@ -152,7 +153,7 @@ public class BoolConditionTest {
         }
     }
 
-    // --- while accepts Bool ---
+    // --- if without parens rejects non-Bool ---
 
     @Nested
     @DisplayName("while accepts Bool conditions")
@@ -180,19 +181,19 @@ public class BoolConditionTest {
         @DisplayName("while with Bool variable works")
         void testWhileBoolVar() {
             var src = """
-                let flag = true;
-                let count = 0;
-                while flag {
-                    count = count + 1;
-                    if count == 3 { flag = false; }
-                }
-                count;
-            """;
+                        let flag = true
+                        let count = 0
+                        while flag {
+                            count = count + 1
+                            if count == 3 { flag = false }
+                        }
+                        count
+                    """;
             assertEval(src, 3);
         }
     }
 
-    // --- if without parens rejects non-Bool ---
+    // --- Helpers ---
 
     @Nested
     @DisplayName("if without parens rejects non-Bool")
@@ -204,12 +205,5 @@ public class BoolConditionTest {
             var ex = assertThrows(PolyglotException.class, () -> context.eval("relang", "if 1 { 10; }"));
             assertTrue(ex.getMessage().contains("Condition must be Bool"));
         }
-    }
-
-    // --- Helpers ---
-
-    private void assertEval(String source, long expected) {
-        Value result = context.eval("relang", source);
-        assertEquals(expected, result.asLong());
     }
 }

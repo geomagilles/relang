@@ -83,6 +83,16 @@ public class AwaitableHandle implements TruffleObject, Serializable {
     }
 
     @ExportMessage
+    boolean hasMetaObject() {
+        return true;
+    }
+
+    @ExportMessage
+    Object getMetaObject() {
+        return new ReLangMetaType("Awaitable");
+    }
+
+    @ExportMessage
     @SuppressWarnings("unused")
     String toDisplayString(boolean allowSideEffects) {
         return "*Awaitable(" + id.substring(0, 8) + "... " + status + ")";

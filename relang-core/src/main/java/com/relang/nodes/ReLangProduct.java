@@ -1,6 +1,9 @@
 package com.relang.nodes;
 
+import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
+import com.oracle.truffle.api.library.ExportLibrary;
+import com.oracle.truffle.api.library.ExportMessage;
 
 import java.util.Arrays;
 
@@ -9,6 +12,7 @@ import java.util.Arrays;
  * For example, {@code (42 & "ok")} creates a product with two components.
  * Supports structural equality.
  */
+@ExportLibrary(InteropLibrary.class)
 public final class ReLangProduct implements TruffleObject {
     private final Object[] components;
 
@@ -27,6 +31,21 @@ public final class ReLangProduct implements TruffleObject {
     public int size() { return components.length; }
 
     public Object[] getComponents() { return components.clone(); }
+
+    @ExportMessage
+    boolean hasMetaObject() {
+        return true;
+    }
+
+    @ExportMessage
+    Object getMetaObject() {
+        return ReLangMetaType.PRODUCT;
+    }
+
+    @ExportMessage
+    Object toDisplayString(@SuppressWarnings("unused") boolean allowSideEffects) {
+        return toString();
+    }
 
     @Override
     public boolean equals(Object o) {
