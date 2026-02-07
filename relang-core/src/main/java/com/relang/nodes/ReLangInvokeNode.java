@@ -51,7 +51,7 @@ public final class ReLangInvokeNode extends ReLangNode {
             ReLangContext context = ReLangContext.get(this);
             descriptor = context.getFunctionRegistry().get(functionName);
             if (descriptor == null) {
-                throw new RuntimeException("Function not found: " + functionName);
+                throw new ReLangTypeError(this, RuntimeDiagnostics.unknownFunction(functionName));
             }
             callNode = insert(Truffle.getRuntime().createDirectCallNode(descriptor.callTarget()));
         }
@@ -92,7 +92,7 @@ public final class ReLangInvokeNode extends ReLangNode {
                 if (argumentNames[i] != null) {
                     int paramIndex = paramNames.indexOf(argumentNames[i]);
                     if (paramIndex < 0) {
-                        throw new RuntimeException("Unknown parameter name: " + argumentNames[i] + " in function " + functionName);
+                        throw new ReLangTypeError(this, RuntimeDiagnostics.unknownNamedArgument(functionName, argumentNames[i]));
                     }
                     args[paramIndex] = argumentNodes[i].executeGeneric(frame);
                 }

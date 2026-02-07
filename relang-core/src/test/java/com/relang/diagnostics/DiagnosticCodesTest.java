@@ -18,6 +18,11 @@ class DiagnosticCodesTest {
         assertEquals("RL2000", DiagnosticCodes.fallbackFor(DiagnosticCategory.TYPE).value());
         assertEquals("RL3000", DiagnosticCodes.fallbackFor(DiagnosticCategory.RUNTIME).value());
         assertEquals("RL9000", DiagnosticCodes.fallbackFor(DiagnosticCategory.INTERNAL).value());
+        assertTrue(DiagnosticCodes.find("RL3001").isPresent());
+        assertTrue(DiagnosticCodes.find("RL3002").isPresent());
+        assertTrue(DiagnosticCodes.find("RL3003").isPresent());
+        assertTrue(DiagnosticCodes.find("RL3004").isPresent());
+        assertTrue(DiagnosticCodes.find("RL3005").isPresent());
     }
 
     @Test
@@ -31,6 +36,25 @@ class DiagnosticCodesTest {
         assertEquals(DiagnosticSeverity.ERROR, diagnostic.severity());
         assertEquals(3, diagnostic.primaryRange().startLine());
         assertEquals(12, diagnostic.primaryRange().startColumn());
+    }
+
+    @Test
+    @DisplayName("TypeError preserves secondary notes in structured diagnostic")
+    void typeErrorCarriesNotes() {
+        var note = new DiagnosticNote("Variable declared here", SourceRange.point(1, 4));
+        var error = new TypeError(
+                DiagnosticCodes.TYPE_MISMATCH,
+                3,
+                12,
+                "Cannot assign String to Int",
+                "\"hello\"",
+                "Use an Int value.",
+                java.util.List.of(note)
+        );
+
+        var diagnostic = error.toDiagnostic();
+        assertEquals(1, diagnostic.notes().size());
+        assertEquals("Variable declared here", diagnostic.notes().getFirst().message());
     }
 
     @Test

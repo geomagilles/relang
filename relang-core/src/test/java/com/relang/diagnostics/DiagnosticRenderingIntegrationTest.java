@@ -46,6 +46,22 @@ class DiagnosticRenderingIntegrationTest {
         assertTrue(ex.getMessage().contains("RL10"), "Expected RL1xxx code in message, got: " + ex.getMessage());
     }
 
+    @Test
+    @DisplayName("Non-exhaustive match emits RL3003 runtime diagnostic code")
+    void runtimeNonExhaustiveMatchCode() {
+        var ex = expectFailure("match 1 { 2 -> 2 };");
+        assertTrue(ex.getMessage().contains("RL3003"), "Expected RL3003 in message, got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("help:"), "Expected help hint in message, got: " + ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("Unknown named argument emits RL3004 runtime diagnostic code")
+    void runtimeInvalidNamedArgumentCode() {
+        var ex = expectFailure("fn add(a: Int, b: Int): Int = a + b; add(a: 1, c: 2);");
+        assertTrue(ex.getMessage().contains("RL3004"), "Expected RL3004 in message, got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("help:"), "Expected help hint in message, got: " + ex.getMessage());
+    }
+
     private PolyglotException expectFailure(String source) {
         return org.junit.jupiter.api.Assertions.assertThrows(
                 PolyglotException.class,

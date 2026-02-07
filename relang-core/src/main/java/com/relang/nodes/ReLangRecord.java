@@ -28,7 +28,7 @@ public final class ReLangRecord implements TruffleObject {
 
     public Object getField(String name) {
         if (!fields.containsKey(name)) {
-            throw new ReLangTypeError(null, "No field '" + name + "' in type " + typeName);
+            throw new ReLangTypeError(null, RuntimeDiagnostics.missingRecordField(name, typeName));
         }
         return fields.get(name);
     }

@@ -20,14 +20,14 @@ public final class LogicalAndNode extends ReLangNode {
     public Object executeGeneric(VirtualFrame frame) {
         var leftValue = left.executeGeneric(frame);
         if (!(leftValue instanceof Boolean leftBool)) {
-            throw new ReLangTypeError(this, "Operand of 'and' must be Bool, got " + leftValue.getClass().getSimpleName());
+            throw new ReLangTypeError(this, RuntimeDiagnostics.logicalOperandMustBeBool("and", leftValue));
         }
         if (leftProfile.profile(!leftBool)) {
             return false;
         }
         var rightValue = right.executeGeneric(frame);
         if (!(rightValue instanceof Boolean rightBool)) {
-            throw new ReLangTypeError(this, "Operand of 'and' must be Bool, got " + rightValue.getClass().getSimpleName());
+            throw new ReLangTypeError(this, RuntimeDiagnostics.logicalOperandMustBeBool("and", rightValue));
         }
         return rightBool;
     }

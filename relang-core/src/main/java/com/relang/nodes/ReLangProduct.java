@@ -22,8 +22,7 @@ public final class ReLangProduct implements TruffleObject {
 
     public Object get(int index) {
         if (index < 0 || index >= components.length) {
-            throw new ReLangTypeError(null,
-                    "Product index " + index + " out of bounds (size: " + components.length + ")");
+            throw new ReLangTypeError(null, RuntimeDiagnostics.productIndexOutOfBounds(index, components.length));
         }
         return components[index];
     }

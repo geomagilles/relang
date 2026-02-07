@@ -1,6 +1,9 @@
 package com.relang.parser;
 
 import com.relang.diagnostics.DiagnosticCode;
+import com.relang.diagnostics.DiagnosticNote;
+import com.relang.diagnostics.SourceRange;
+import org.antlr.v4.runtime.Token;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,25 +51,27 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     /** Registry of user-declared types (both sealed markers and concrete record types). */
     private final Map<String, UserTypeInfo> userTypes = new HashMap<>();
 
-    record UserTypeInfo(String name, String sealedParent, Map<String, ReLangType> fields) {}
+    record UserTypeInfo(String name, String sealedParent, Map<String, ReLangType> fields, SourceRange declarationRange) {}
 
     // ---- Inner classes ----
 
     private static class Scope {
         private final Scope parent;
         private final Map<String, ReLangType> variables = new HashMap<>();
+        private final Map<String, SourceRange> declarations = new HashMap<>();
         private final Set<String> parameters = new HashSet<>();
 
         Scope(Scope parent) {
             this.parent = parent;
         }
 
-        void define(String name, ReLangType type) {
+        void define(String name, ReLangType type, SourceRange declarationRange) {
             variables.put(name, type);
+            declarations.put(name, declarationRange);
         }
 
-        void defineParameter(String name, ReLangType type) {
-            variables.put(name, type);
+        void defineParameter(String name, ReLangType type, SourceRange declarationRange) {
+            define(name, type, declarationRange);
             parameters.add(name);
         }
 
@@ -78,6 +83,12 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
         boolean isDefined(String name) {
             return lookup(name) != null;
+        }
+
+        SourceRange lookupDeclaration(String name) {
+            if (declarations.containsKey(name)) return declarations.get(name);
+            if (parent != null) return parent.lookupDeclaration(name);
+            return null;
         }
 
         boolean isParameter(String name) {
@@ -101,15 +112,16 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             String name,
             List<ParamSignature> params,
             int requiredCount,
-            ReLangType returnType
+            ReLangType returnType,
+            SourceRange declarationRange
     ) {
         /** Return a new signature with the given return type. */
         FunctionSignature withReturnType(ReLangType rt) {
-            return new FunctionSignature(name, params, requiredCount, rt);
+            return new FunctionSignature(name, params, requiredCount, rt, declarationRange);
         }
     }
 
-    record ParamSignature(String name, ReLangType type) {}
+    record ParamSignature(String name, ReLangType type, SourceRange declarationRange) {}
 
     // ---- Public API ----
 
@@ -156,37 +168,42 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         // resolved(value) -> Awaitable<Unknown>
         functionSignatures.put("resolved", new FunctionSignature(
                 "resolved",
-                List.of(new ParamSignature("value", ReLangType.UnknownType.INSTANCE)),
+                List.of(new ParamSignature("value", ReLangType.UnknownType.INSTANCE, null)),
                 1,
-                new ReLangType.AwaitableType(ReLangType.UnknownType.INSTANCE)
+                new ReLangType.AwaitableType(ReLangType.UnknownType.INSTANCE),
+                null
         ));
         // pending() -> Awaitable<Unknown>
         functionSignatures.put("pending", new FunctionSignature(
                 "pending",
                 List.of(),
                 0,
-                new ReLangType.AwaitableType(ReLangType.UnknownType.INSTANCE)
+                new ReLangType.AwaitableType(ReLangType.UnknownType.INSTANCE),
+                null
         ));
         // now() -> Timestamp
         functionSignatures.put("now", new FunctionSignature(
                 "now",
                 List.of(),
                 0,
-                ReLangType.TimestampType.INSTANCE
+                ReLangType.TimestampType.INSTANCE,
+                null
         ));
         // Failure(message: String) -> Failure
         functionSignatures.put("Failure", new FunctionSignature(
                 "Failure",
-                List.of(new ParamSignature("message", ReLangType.StringType.INSTANCE)),
+                List.of(new ParamSignature("message", ReLangType.StringType.INSTANCE, null)),
                 1,
-                ReLangType.FailureType.INSTANCE
+                ReLangType.FailureType.INSTANCE,
+                null
         ));
         // json(text: String) -> Json
         functionSignatures.put("json", new FunctionSignature(
                 "json",
-                List.of(new ParamSignature("text", ReLangType.StringType.INSTANCE)),
+                List.of(new ParamSignature("text", ReLangType.StringType.INSTANCE, null)),
                 1,
-                ReLangType.JsonType.INSTANCE
+                ReLangType.JsonType.INSTANCE,
+                null
         ));
     }
 
@@ -194,7 +211,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         switch (ctx) {
             case ReLangParser.DeclSealedContext sd -> {
                 var name = sd.ID().getText();
-                userTypes.put(name, new UserTypeInfo(name, null, Map.of()));
+                userTypes.put(name, new UserTypeInfo(name, null, Map.of(), sourceRangeFromToken(sd.ID().getSymbol(), sd.ID().getText())));
             }
             case ReLangParser.DeclTypeContext td -> {
                 var name = td.ID(0).getText();
@@ -205,7 +222,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                     var fieldType = resolveType(field.typeRef());
                     fields.put(fieldName, fieldType);
                 }
-                userTypes.put(name, new UserTypeInfo(name, parent, fields));
+                userTypes.put(name, new UserTypeInfo(name, parent, fields, sourceRangeFromToken(td.ID(0).getSymbol(), td.ID(0).getText())));
             }
             default -> {}
         }
@@ -272,7 +289,13 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var returnType = fb.typeRef() != null
                         ? resolveType(fb.typeRef())
                         : null; // null = needs inference
-                functionSignatures.put(name, new FunctionSignature(name, params, requiredCount, returnType));
+                functionSignatures.put(name, new FunctionSignature(
+                        name,
+                        params,
+                        requiredCount,
+                        returnType,
+                        sourceRangeFromToken(fb.ID().getSymbol(), fb.ID().getText())
+                ));
             }
             case ReLangParser.FunctionExprContext fe -> {
                 var name = fe.ID().getText();
@@ -281,7 +304,13 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var returnType = fe.typeRef() != null
                         ? resolveType(fe.typeRef())
                         : null; // null = needs inference
-                functionSignatures.put(name, new FunctionSignature(name, params, requiredCount, returnType));
+                functionSignatures.put(name, new FunctionSignature(
+                        name,
+                        params,
+                        requiredCount,
+                        returnType,
+                        sourceRangeFromToken(fe.ID().getSymbol(), fe.ID().getText())
+                ));
             }
             default -> {}
         }
@@ -295,9 +324,17 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             var name = p.ID().getText();
             if (p.typeRef() == null) {
                 addError(p, TypeDiagnostics.missingTypeAnnotation(name));
-                result.add(new ParamSignature(name, ReLangType.UnknownType.INSTANCE));
+                result.add(new ParamSignature(
+                        name,
+                        ReLangType.UnknownType.INSTANCE,
+                        sourceRangeFromToken(p.ID().getSymbol(), p.ID().getText())
+                ));
             } else {
-                result.add(new ParamSignature(name, resolveType(p.typeRef())));
+                result.add(new ParamSignature(
+                        name,
+                        resolveType(p.typeRef()),
+                        sourceRangeFromToken(p.ID().getSymbol(), p.ID().getText())
+                ));
             }
         }
         return result;
@@ -344,7 +381,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         // Set up function scope with param types
         var funcScope = new Scope(null);
         for (var p : sig.params()) {
-            funcScope.defineParameter(p.name(), p.type());
+            funcScope.defineParameter(p.name(), p.type(), p.declarationRange());
         }
         var savedScope = currentScope;
         var savedReturn = currentFunctionReturnType;
@@ -383,7 +420,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var sig = functionSignatures.get(fb.ID().getText());
                 var funcScope = new Scope(null);
                 for (var p : sig.params()) {
-                    funcScope.defineParameter(p.name(), p.type());
+                    funcScope.defineParameter(p.name(), p.type(), p.declarationRange());
                 }
                 var savedScope = currentScope;
                 var savedReturn = currentFunctionReturnType;
@@ -397,7 +434,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var sig = functionSignatures.get(fe.ID().getText());
                 var funcScope = new Scope(null);
                 for (var p : sig.params()) {
-                    funcScope.defineParameter(p.name(), p.type());
+                    funcScope.defineParameter(p.name(), p.type(), p.declarationRange());
                 }
                 var savedScope = currentScope;
                 var savedReturn = currentFunctionReturnType;
@@ -657,9 +694,17 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
         // Check arity
         if (argCount < sig.requiredCount()) {
-            addError(ctx, TypeDiagnostics.arityAtLeast(funcName, sig.requiredCount(), argCount));
+            addError(
+                    ctx,
+                    TypeDiagnostics.arityAtLeast(funcName, sig.requiredCount(), argCount),
+                    declarationNote("Function declared here", sig.declarationRange())
+            );
         } else if (argCount > sig.params().size()) {
-            addError(ctx, TypeDiagnostics.arityAtMost(funcName, sig.params().size(), argCount));
+            addError(
+                    ctx,
+                    TypeDiagnostics.arityAtMost(funcName, sig.params().size(), argCount),
+                    declarationNote("Function declared here", sig.declarationRange())
+            );
         }
 
         // Check arg types (positional only for now - named args don't change this logic much)
@@ -676,7 +721,12 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                     var paramType = sig.params().get(i).type();
                     if (!(paramType instanceof ReLangType.UnknownType) && !(argType instanceof ReLangType.UnknownType)) {
                         if (!argType.isAssignableTo(paramType)) {
-                            addError(ctx, TypeDiagnostics.argumentTypeMismatch(funcName, i + 1, paramType, argType));
+                            var parameterRange = sig.params().get(i).declarationRange();
+                            addError(
+                                    ctx,
+                                    TypeDiagnostics.argumentTypeMismatch(funcName, i + 1, paramType, argType),
+                                    declarationNote("Parameter declared here", parameterRange)
+                            );
                         }
                     }
                 }
@@ -722,7 +772,11 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             if (typeInfo != null && typeInfo.fields().containsKey(fieldName)) {
                 return typeInfo.fields().get(fieldName);
             }
-            addError(ctx, TypeDiagnostics.unknownFieldInType(fieldName, ut.name()));
+            addError(
+                    ctx,
+                    TypeDiagnostics.unknownFieldInType(fieldName, ut.name()),
+                    declarationNote("Type declared here", typeInfo != null ? typeInfo.declarationRange() : null)
+            );
             return ReLangType.UnknownType.INSTANCE;
         }
         if (receiverType instanceof ReLangType.UnknownType) return ReLangType.UnknownType.INSTANCE;
@@ -749,16 +803,28 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
             var expectedType = typeInfo.fields().get(fieldName);
             if (expectedType == null) {
-                addError(fi, TypeDiagnostics.unknownFieldInConstruction(fieldName, typeName));
+                addError(
+                        fi,
+                        TypeDiagnostics.unknownFieldInConstruction(fieldName, typeName),
+                        declarationNote("Type declared here", typeInfo.declarationRange())
+                );
             } else if (!(exprType instanceof ReLangType.UnknownType) && !exprType.isAssignableTo(expectedType)) {
-                addError(fi, TypeDiagnostics.fieldTypeMismatch(fieldName, expectedType, exprType));
+                addError(
+                        fi,
+                        TypeDiagnostics.fieldTypeMismatch(fieldName, expectedType, exprType),
+                        declarationNote("Type declared here", typeInfo.declarationRange())
+                );
             }
         }
 
         // Check all required fields are provided
         for (var requiredField : typeInfo.fields().keySet()) {
             if (!providedFields.contains(requiredField)) {
-                addError(ctx, TypeDiagnostics.missingField(requiredField, typeName));
+                addError(
+                        ctx,
+                        TypeDiagnostics.missingField(requiredField, typeName),
+                        declarationNote("Type declared here", typeInfo.declarationRange())
+                );
             }
         }
 
@@ -779,9 +845,9 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                     addError(ctx, TypeDiagnostics.declaredAssignmentMismatch(declaredType, rhsType));
                 }
             }
-            currentScope.define(varName, declaredType);
+            currentScope.define(varName, declaredType, sourceRangeFromToken(ctx.ID().getSymbol(), varName));
         } else {
-            currentScope.define(varName, rhsType);
+            currentScope.define(varName, rhsType, sourceRangeFromToken(ctx.ID().getSymbol(), varName));
         }
         return ReLangType.UnitType.INSTANCE;
     }
@@ -796,14 +862,23 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (existingType == null) {
             addError(ctx, TypeDiagnostics.undefinedVariable(varName));
         } else {
+            var declarationRange = currentScope.lookupDeclaration(varName);
             // Check parameter immutability
             if (currentScope.isParameter(varName)) {
-                addError(ctx, TypeDiagnostics.immutableParameterReassignment(varName));
+                addError(
+                        ctx,
+                        TypeDiagnostics.immutableParameterReassignment(varName),
+                        declarationNote("Parameter declared here", declarationRange)
+                );
             }
             // Check type compatibility
             if (!(existingType instanceof ReLangType.UnknownType) && !(rhsType instanceof ReLangType.UnknownType)) {
                 if (!rhsType.isAssignableTo(existingType)) {
-                    addError(ctx, TypeDiagnostics.assignmentMismatch(existingType, rhsType));
+                    addError(
+                            ctx,
+                            TypeDiagnostics.assignmentMismatch(existingType, rhsType),
+                            declarationNote("Variable declared here", declarationRange)
+                    );
                 }
             }
         }
@@ -862,7 +937,11 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         checkIntBound(endType, ctx, "for-range end");
 
         var loopScope = new Scope(currentScope);
-        loopScope.define(ctx.ID().getText(), ReLangType.IntType.INSTANCE);
+        loopScope.define(
+                ctx.ID().getText(),
+                ReLangType.IntType.INSTANCE,
+                sourceRangeFromToken(ctx.ID().getSymbol(), ctx.ID().getText())
+        );
         var savedScope = currentScope;
         var savedInsideLoop = insideLoop;
         currentScope = loopScope;
@@ -881,7 +960,11 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         checkIntBound(endType, ctx, "for-range end");
 
         var loopScope = new Scope(currentScope);
-        loopScope.define(ctx.ID().getText(), ReLangType.IntType.INSTANCE);
+        loopScope.define(
+                ctx.ID().getText(),
+                ReLangType.IntType.INSTANCE,
+                sourceRangeFromToken(ctx.ID().getSymbol(), ctx.ID().getText())
+        );
         var savedScope = currentScope;
         var savedInsideLoop = insideLoop;
         currentScope = loopScope;
@@ -1086,10 +1169,42 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         addError(ctx, diagnostic.code(), diagnostic.message(), diagnostic.help());
     }
 
+    private void addError(
+            org.antlr.v4.runtime.ParserRuleContext ctx,
+            TypeDiagnostics.Spec diagnostic,
+            List<DiagnosticNote> notes
+    ) {
+        addError(ctx, diagnostic.code(), diagnostic.message(), diagnostic.help(), notes);
+    }
+
     private void addError(org.antlr.v4.runtime.ParserRuleContext ctx, DiagnosticCode code, String message, String help) {
+        addError(ctx, code, message, help, List.of());
+    }
+
+    private void addError(
+            org.antlr.v4.runtime.ParserRuleContext ctx,
+            DiagnosticCode code,
+            String message,
+            String help,
+            List<DiagnosticNote> notes
+    ) {
         int line = ctx.getStart().getLine();
         int col = ctx.getStart().getCharPositionInLine();
         var snippet = ctx.getText();
-        errors.add(new TypeError(code, line, col, message, snippet, help));
+        errors.add(new TypeError(code, line, col, message, snippet, help, notes));
+    }
+
+    private static List<DiagnosticNote> declarationNote(String message, SourceRange range) {
+        if (range == null) {
+            return List.of();
+        }
+        return List.of(new DiagnosticNote(message, range));
+    }
+
+    private static SourceRange sourceRangeFromToken(Token token, String snippet) {
+        if (token == null) {
+            return null;
+        }
+        return SourceRange.fromSnippet(token.getLine(), token.getCharPositionInLine(), snippet);
     }
 }

@@ -89,11 +89,12 @@ Add parser diagnostic translation from ANTLR internals to user vocabulary:
 - [x] P0 - Exception and transport integration
   - Structured diagnostics are carried in parser/type exceptions.
   - Renderer-based compatibility message path is active.
+  - Runtime node failures now emit structured `RL3xxx` diagnostics with actionable `help:` hints.
 - [x] P1 - CLI diagnostic renderer upgrade
   - Rust-style code-frame output is available with `help:` / `note:`.
-- [ ] P1 - LSP enrichment
-  - Current status: `relang-lsp` emits diagnostics directly with structured `code`, `source`, `data.relangHelp`, `relatedInformation`, and quick-fix payloads for high-confidence cases, including unknown-function rename suggestions.
-  - Remaining: enrich related context generation from core diagnostics (declaration-site/secondary ranges).
+- [x] P1 - LSP enrichment
+  - `relang-lsp` emits diagnostics directly with structured `code`, `source`, `data.relangHelp`, `relatedInformation`, and quick-fix payloads for high-confidence cases.
+  - Core type diagnostics now attach declaration-site notes for key errors (arity mismatch, argument mismatch, assignment mismatches, immutable parameter reassignment, and user-type field issues), which are surfaced in LSP `relatedInformation`.
 - [x] P1 - Test suite hardening
   - Added diagnostic matrix regression tests (30+ scenarios) with code/help gates.
 - [x] P0 - Documentation and governance baseline
@@ -105,7 +106,8 @@ Add parser diagnostic translation from ANTLR internals to user vocabulary:
 
 - Completed now: P0 foundation for model, parser mapping, type builder consolidation, compatibility integration, baseline docs, and direct structured LSP `code` wiring.
 - Completed now: P1 matrix-based regression coverage and governance gates in CI test flow.
-- Next critical target: enrich core-generated related ranges for deeper editor context.
+- Completed now: runtime diagnostics baseline (`RL3001`-`RL3005`) is wired in core runtime node failures.
+- Next critical target: extend runtime declaration/context notes and cover state-mismatch/resume errors with dedicated `RL3xxx` diagnostics.
 
 ## Module-by-Module Deliverables
 
@@ -139,6 +141,9 @@ Add parser diagnostic translation from ANTLR internals to user vocabulary:
    - recursive return type inference failure.
 3. Runtime errors:
    - invalid operation at runtime,
+   - non-exhaustive match at runtime,
+   - invalid runtime argument binding,
+   - invalid runtime condition values,
    - state mismatch/resume related failures.
 4. LSP:
    - diagnostic code present,

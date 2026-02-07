@@ -12,9 +12,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Diagnostic Scenario Matrix")
 class DiagnosticScenarioMatrixTest {
@@ -56,17 +54,35 @@ class DiagnosticScenarioMatrixTest {
             Scenario.prefix("syntax missing rhs expression", "fn main(): Int = ;", "RL10")
     );
 
+    private static Stream<Scenario> scenarios() {
+        return SCENARIOS.stream();
+    }
+
+    private static ReLangDiagnostic firstDiagnostic(String sourceText) {
+        var source = Source.newBuilder("relang", sourceText, "scenario.re").build();
+        try {
+            var tree = ReLangTruffleParser.parseAntlr(source);
+            var errors = new ReLangTypeChecker().check(tree);
+            assertFalse(errors.isEmpty(), "Expected at least one type diagnostic");
+            return errors.getFirst().toDiagnostic();
+        } catch (ReLangSyntaxException syntaxException) {
+            var diagnostics = syntaxException.getDiagnostics();
+            if (diagnostics.isEmpty()) {
+                fail("Syntax exception without diagnostics");
+            }
+            return diagnostics.getFirst();
+        }
+    }
+
     @ParameterizedTest(name = "{index} - {0}")
     @MethodSource("scenarios")
     @DisplayName("first diagnostic matches expected code and includes help")
     void matrixCoverage(Scenario scenario) {
         var diagnostic = firstDiagnostic(scenario.source());
         if (scenario.exactMatch()) {
-            assertTrue(
-                    diagnostic.code().value().equals(scenario.expectedCode()),
+            assertEquals(diagnostic.code().value(), scenario.expectedCode(),
                     () -> "Expected " + scenario.expectedCode() + " but got " + diagnostic.code().value()
-                            + " for source: " + scenario.name()
-            );
+                            + " for source: " + scenario.name());
         } else {
             assertTrue(
                     diagnostic.code().value().startsWith(scenario.expectedCode()),
@@ -96,26 +112,6 @@ class DiagnosticScenarioMatrixTest {
                 .count();
         var coverage = (double) withHelp / SCENARIOS.size();
         assertTrue(coverage >= 0.80, "Expected help coverage >= 0.80, got: " + coverage);
-    }
-
-    private static Stream<Scenario> scenarios() {
-        return SCENARIOS.stream();
-    }
-
-    private static ReLangDiagnostic firstDiagnostic(String sourceText) {
-        var source = Source.newBuilder("relang", sourceText, "scenario.re").build();
-        try {
-            var tree = ReLangTruffleParser.parseAntlr(source);
-            var errors = new ReLangTypeChecker().check(tree);
-            assertFalse(errors.isEmpty(), "Expected at least one type diagnostic");
-            return errors.getFirst().toDiagnostic();
-        } catch (ReLangSyntaxException syntaxException) {
-            var diagnostics = syntaxException.getDiagnostics();
-            if (diagnostics.isEmpty()) {
-                fail("Syntax exception without diagnostics");
-            }
-            return diagnostics.getFirst();
-        }
     }
 
     private record Scenario(String name, String source, String expectedCode, boolean exactMatch) {

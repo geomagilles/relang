@@ -25,8 +25,7 @@ public final class ReLangAwaitNode extends ReLangNode {
         var value = awaitableExpr.executeGeneric(frame);
 
         if (!(value instanceof AwaitableHandle handle)) {
-            throw new RuntimeException("await requires an awaitable (*T), got: "
-                    + (value == null ? "null" : value.getClass().getSimpleName()));
+            throw new ReLangTypeError(this, RuntimeDiagnostics.invalidAwaitOperand(value));
         }
 
         if (handle.isResolved()) {

@@ -76,8 +76,7 @@ public abstract class ReLangNode extends Node implements InstrumentableNode {
     protected boolean evaluateAsBoolean(Object value) {
         return switch (value) {
             case Boolean b -> b;
-            default -> throw new ReLangTypeError(this,
-                    "Condition must be Bool, got: " + (value == null ? "none" : value.getClass().getSimpleName()));
+            default -> throw new ReLangTypeError(this, RuntimeDiagnostics.conditionMustBeBool(value));
         };
     }
 }

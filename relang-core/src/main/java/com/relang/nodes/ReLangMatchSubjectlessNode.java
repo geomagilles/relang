@@ -21,7 +21,7 @@ public final class ReLangMatchSubjectlessNode extends ReLangNode {
                 return arm.executeBody(frame);
             }
         }
-        throw new ReLangTypeError(this, "Non-exhaustive match: no condition was true");
+        throw new ReLangTypeError(this, RuntimeDiagnostics.nonExhaustiveSubjectlessMatch());
     }
 
     public static final class SubjectlessArmNode extends ReLangNode {
@@ -39,7 +39,7 @@ public final class ReLangMatchSubjectlessNode extends ReLangNode {
             if (isWildcard) return true;
             var val = conditionNode.executeGeneric(frame);
             if (!(val instanceof Boolean b)) {
-                throw new ReLangTypeError(this, "Subjectless match arm condition must be Bool, got " + val.getClass().getSimpleName());
+                throw new ReLangTypeError(this, RuntimeDiagnostics.invalidSubjectlessMatchCondition(val));
             }
             return b;
         }

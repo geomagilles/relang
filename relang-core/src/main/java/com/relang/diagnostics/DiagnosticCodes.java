@@ -36,6 +36,10 @@ public final class DiagnosticCodes {
     // RL3xxx: runtime diagnostics
     public static final DiagnosticCode RUNTIME_GENERIC = new DiagnosticCode("RL3000", DiagnosticCategory.RUNTIME, "Runtime error");
     public static final DiagnosticCode RUNTIME_INVALID_OPERATION = new DiagnosticCode("RL3001", DiagnosticCategory.RUNTIME, "Invalid runtime operation");
+    public static final DiagnosticCode RUNTIME_UNKNOWN_FUNCTION = new DiagnosticCode("RL3002", DiagnosticCategory.RUNTIME, "Unknown runtime function");
+    public static final DiagnosticCode RUNTIME_NON_EXHAUSTIVE_MATCH = new DiagnosticCode("RL3003", DiagnosticCategory.RUNTIME, "Non-exhaustive match");
+    public static final DiagnosticCode RUNTIME_INVALID_ARGUMENT = new DiagnosticCode("RL3004", DiagnosticCategory.RUNTIME, "Invalid runtime argument");
+    public static final DiagnosticCode RUNTIME_INVALID_CONDITION = new DiagnosticCode("RL3005", DiagnosticCategory.RUNTIME, "Invalid runtime condition");
 
     // RL9xxx: internal/tooling diagnostics
     public static final DiagnosticCode INTERNAL_GENERIC = new DiagnosticCode("RL9000", DiagnosticCategory.INTERNAL, "Internal tooling error");
@@ -62,6 +66,10 @@ public final class DiagnosticCodes {
             TYPE_INVALID_MATCH_PATTERN,
             RUNTIME_GENERIC,
             RUNTIME_INVALID_OPERATION,
+            RUNTIME_UNKNOWN_FUNCTION,
+            RUNTIME_NON_EXHAUSTIVE_MATCH,
+            RUNTIME_INVALID_ARGUMENT,
+            RUNTIME_INVALID_CONDITION,
             INTERNAL_GENERIC
     );
 

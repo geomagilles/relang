@@ -21,7 +21,7 @@ public final class ReLangBuiltinResolvedNode extends RootNode {
     public Object execute(VirtualFrame frame) {
         var args = frame.getArguments();
         if (args.length < 1) {
-            throw new RuntimeException("resolved() requires exactly 1 argument");
+            throw new ReLangTypeError(this, RuntimeDiagnostics.resolvedArity(args.length));
         }
 
         var handle = new AwaitableHandle();

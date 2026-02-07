@@ -23,8 +23,6 @@ public final class ReLangFieldAccessNode extends ReLangNode {
         if (obj instanceof ReLangRecord record) {
             return record.getField(fieldName);
         }
-        throw new ReLangTypeError(this,
-                "Cannot access field '" + fieldName + "' on non-record value of type "
-                        + (obj == null ? "none" : obj.getClass().getSimpleName()));
+        throw new ReLangTypeError(this, RuntimeDiagnostics.invalidFieldAccess(fieldName, obj));
     }
 }

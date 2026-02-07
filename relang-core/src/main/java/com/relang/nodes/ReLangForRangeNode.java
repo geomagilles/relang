@@ -33,10 +33,10 @@ public final class ReLangForRangeNode extends ReLangNode {
         var endVal = endNode.executeGeneric(frame);
 
         if (!(startVal instanceof Long start)) {
-            throw new ReLangTypeError(this, "Range start must be Int, got " + startVal.getClass().getSimpleName());
+            throw new ReLangTypeError(this, RuntimeDiagnostics.rangeBoundMustBeInt("start", startVal));
         }
         if (!(endVal instanceof Long end)) {
-            throw new ReLangTypeError(this, "Range end must be Int, got " + endVal.getClass().getSimpleName());
+            throw new ReLangTypeError(this, RuntimeDiagnostics.rangeBoundMustBeInt("end", endVal));
         }
 
         long limit = inclusive ? end + 1 : end;

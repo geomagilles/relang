@@ -25,7 +25,7 @@ public final class ReLangMatchNode extends ReLangNode {
                 return arm.executeBody(frame);
             }
         }
-        throw new ReLangTypeError(this, "Non-exhaustive match: no arm matched value " + subject);
+        throw new ReLangTypeError(this, RuntimeDiagnostics.nonExhaustiveMatchOnSubject(subject));
     }
 
     /**
