@@ -84,6 +84,14 @@ final class TypeDiagnostics {
         );
     }
 
+    static Spec outOfScopeVariable(String name) {
+        return new Spec(
+                DiagnosticCodes.TYPE_OUT_OF_SCOPE_VARIABLE,
+                "Variable '" + name + "' is out of scope",
+                "Move the declaration to an outer scope or use the variable inside its declaring block."
+        );
+    }
+
     static Spec unknownFunction(String functionName) {
         return new Spec(
                 DiagnosticCodes.TYPE_UNKNOWN_FUNCTION,
@@ -92,19 +100,43 @@ final class TypeDiagnostics {
         );
     }
 
-    static Spec arityAtLeast(String functionName, int required, int actual) {
+    static Spec unknownNamedArgument(String functionName, String argumentName, String expectedSignature) {
         return new Spec(
-                DiagnosticCodes.TYPE_ARITY_MISMATCH,
-                "Function '" + functionName + "' requires at least " + required + " arguments, got " + actual,
-                "Add the missing arguments to the call."
+                DiagnosticCodes.TYPE_UNKNOWN_NAMED_ARGUMENT,
+                "Unknown named argument '" + argumentName + "' for function '" + functionName + "'",
+                "Use one of the declared parameter names. Expected signature: " + expectedSignature
         );
     }
 
-    static Spec arityAtMost(String functionName, int maximum, int actual) {
+    static Spec duplicateNamedArgument(String functionName, String argumentName, String expectedSignature) {
+        return new Spec(
+                DiagnosticCodes.TYPE_UNKNOWN_NAMED_ARGUMENT,
+                "Argument '" + argumentName + "' is provided more than once in call to '" + functionName + "'",
+                "Pass each parameter only once. Expected signature: " + expectedSignature
+        );
+    }
+
+    static Spec positionalAfterNamedArgument(String functionName, String expectedSignature) {
+        return new Spec(
+                DiagnosticCodes.TYPE_UNKNOWN_NAMED_ARGUMENT,
+                "Positional argument cannot appear after named arguments in call to '" + functionName + "'",
+                "Move positional arguments before named arguments. Expected signature: " + expectedSignature
+        );
+    }
+
+    static Spec arityAtLeast(String functionName, int required, int actual, String expectedSignature) {
+        return new Spec(
+                DiagnosticCodes.TYPE_ARITY_MISMATCH,
+                "Function '" + functionName + "' requires at least " + required + " arguments, got " + actual,
+                "Add the missing arguments to the call. Expected signature: " + expectedSignature
+        );
+    }
+
+    static Spec arityAtMost(String functionName, int maximum, int actual, String expectedSignature) {
         return new Spec(
                 DiagnosticCodes.TYPE_ARITY_MISMATCH,
                 "Function '" + functionName + "' accepts at most " + maximum + " arguments, got " + actual,
-                "Remove extra arguments or update the function signature."
+                "Remove extra arguments or update the function signature. Expected signature: " + expectedSignature
         );
     }
 
@@ -210,6 +242,22 @@ final class TypeDiagnostics {
                 DiagnosticCodes.TYPE_INVALID_CONDITION,
                 "Condition must be Bool, got " + conditionType.displayName(),
                 "Change the `" + keyword + "` condition to a Bool expression."
+        );
+    }
+
+    static Spec breakOutsideLoop() {
+        return new Spec(
+                DiagnosticCodes.TYPE_INVALID_CONTROL_FLOW,
+                "`break` can only be used inside a loop",
+                "Use `break` inside `while` or `for`, or remove it."
+        );
+    }
+
+    static Spec continueOutsideLoop() {
+        return new Spec(
+                DiagnosticCodes.TYPE_INVALID_CONTROL_FLOW,
+                "`continue` can only be used inside a loop",
+                "Use `continue` inside `while` or `for`, or remove it."
         );
     }
 

@@ -3,6 +3,7 @@ package com.relang.launcher;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.relang.nodes.SuspendedResult;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 
@@ -101,9 +102,12 @@ public final class FileRunner {
         } catch (IOException e) {
             System.err.println("Error reading file: " + e.getMessage());
             return ExitCodes.ERROR;
-        } catch (Exception e) {
+        } catch (PolyglotException e) {
             System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
+            return ExitCodes.ERROR;
+        } catch (Exception e) {
+            var details = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            System.err.println("Internal error: " + details);
             return ExitCodes.ERROR;
         }
     }

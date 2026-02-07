@@ -1,94 +1,112 @@
-# S6 - Failure canonique, coordination, timers et signals
+# S6 - Canonical Failure Model, Coordination, Timers, and Signals
 
-## Objectif
+## Objective
 
-Stabiliser la semantique d'echec et de coordination, indispensable pour une orchestration durable correcte.
+Stabilize failure and coordination semantics, which are essential for correct durable orchestration.
 
-## Perimetre
+## Scope
 
 IN:
 
-- `Failure` envelope canonique.
-- Propagation inline.
+- canonical `Failure` envelope.
+- inline failure propagation.
 - `and`/`or` awaitables.
-- `AllFailed` (ordre lexical).
+- `AllFailed` (lexical order).
 - `timer(...)`, `receive<T>()`.
 
 OUT:
 
-- wrapping `FunctionFailed` via `spawn` (S7).
-- toutes familles d'actions externes (S8+).
+- `FunctionFailed` wrapping via `spawn` (S7).
+- full external action families (S8+).
 
-## References spec
+## Spec References
 
-- relang-failures-proposal.md
-- relang-awaitables-proposal.md
-- relang-timers-proposal.md
-- relang-signals-proposal.md
+- `relang-failures-proposal.md`
+- `relang-awaitables-proposal.md`
+- `relang-timers-proposal.md`
+- `relang-signals-proposal.md`
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Implementer types runtime `Failure`, `FailureKind`, `ExecutionRef`.
-2. Verifier invariants:
+1. Implement runtime types `Failure`, `FailureKind`, `ExecutionRef`.
+2. Validate invariants:
    - `cause` xor `causes`,
-   - contraintes par kind.
-3. Implementer propagation `x!` (meme failure en inline).
-4. Implementer coordination:
+   - kind-specific constraints.
+3. Implement `x!` propagation (same failure in inline execution).
+4. Implement coordination:
    - `and` fail-fast,
    - `or` first-success,
-   - `AllFailed` si tout echoue.
-5. Garantir ordre lexical dans `AllFailed.causes`.
-6. Implementer `timer(Duration|Timestamp)`:
-   - persister `fireAt`.
-7. Implementer `receive<T>()`:
-   - awaitable durable,
-   - reprise sur snapshot.
-8. Ajouter API introspection awaitables read-only.
+   - `AllFailed` when all fail.
+5. Guarantee lexical order in `AllFailed.causes`.
+6. Implement `timer(Duration|Timestamp)`:
+   - persist `fireAt`.
+7. Implement `receive<T>()`:
+   - durable awaitable,
+   - resume after snapshot.
+8. Add read-only awaitable introspection API.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Semantique failure conforme v0.1.
-- Coordination stable.
-- Timers/signals durables.
+1. Standardize coordination diagnostics:
+   - `and` fail-fast,
+   - `or` all-failed,
+   - timeout/signal errors.
+2. Make root cause explicit:
+   - `Failure.kind`,
+   - `cause`/`causes`,
+   - preserved lexical order.
+3. Add contextual `help:` guidance:
+   - manual retry,
+   - fallback via `or timer(...)`,
+   - expected signal guidance.
+4. Add secondary notes:
+   - source arm/awaitable that produced the failure.
+5. Add `Failure` UX tests:
+   - readable message without runtime-object internals.
 
-## Tests obligatoires
+## Deliverables
 
-- `and` retourne premier echec observe.
-- `or` retourne premier succes.
-- `or` all fail -> `AllFailed` ordonne lexicalement.
-- timer timeout pattern avec `or`.
+- v0.1-compliant failure semantics.
+- Stable coordination behavior.
+- Durable timers/signals.
+
+## Mandatory Tests
+
+- `and` returns first observed failure.
+- `or` returns first success.
+- `or` all fail -> lexically ordered `AllFailed`.
+- timeout pattern with `or`.
 - signal receive + resume.
 
-## Risques et garde-fous
+## Risks and Safeguards
 
-Risque: confusion entre erreurs metier et `Failure` runtime.
+Risk: confusion between domain errors and runtime `Failure`.
 
-Garde-fou:
+Safeguard:
 
-- tests explicites domaine vs infra.
+- explicit tests for domain vs infrastructure errors.
 
-Risque: ordre non deterministe des causes en concurrence.
+Risk: non-deterministic cause ordering under concurrency.
 
-Garde-fou:
+Safeguard:
 
-- tri final selon ordre source, pas ordre d'arrivee runtime.
+- final ordering by source order, not runtime arrival order.
 
 ## Definition of Done
 
-- Failure model et coordination validables par conformance tests.
-- timers/signals operationnels en resume.
+- Failure model and coordination validated by conformance tests.
+- timers/signals operational with resume.
 
+## End-of-Sprint Governance Gate
 
-## Gate governance de fin de sprint
+Mandatory before closure:
 
-Obligatoire avant cloture:
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).
 
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+## Additional S6 Gate (Snapshot RFC Policy)
 
-## Gate supplementaire S6 (snapshot RFC policy)
-
-- Activer la policy `Governance/05-snapshot-rfc-policy.md`.
-- Exiger RFC pour tout changement schema persiste.
-- Ajouter un controle CI (ou checklist PR) qui bloque sans reference RFC.
+- Activate policy `Governance/05-snapshot-rfc-policy.md`.
+- Require an RFC for every persisted schema change.
+- Add CI control (or PR checklist gate) that blocks changes without RFC reference.

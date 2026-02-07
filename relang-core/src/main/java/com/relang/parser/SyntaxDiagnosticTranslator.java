@@ -69,10 +69,13 @@ final class SyntaxDiagnosticTranslator {
             );
         }
 
+        var genericMessage = sourceSnippet == null || sourceSnippet.isBlank()
+                ? "Syntax error."
+                : "Syntax error near " + normalizeToken(sourceSnippet) + ".";
         var genericHelp = sourceSnippet == null || sourceSnippet.isBlank()
                 ? "Check syntax near this position."
-                : "Check syntax near `" + sourceSnippet + "`.";
-        return new Result(DiagnosticCodes.SYNTAX_GENERIC, message, genericHelp);
+                : "Check syntax near " + normalizeToken(sourceSnippet) + ".";
+        return new Result(DiagnosticCodes.SYNTAX_GENERIC, genericMessage, genericHelp);
     }
 
     private static String normalizeExpectation(String value) {

@@ -1,89 +1,107 @@
-# S9 - Familles gRPC et OpenAPI avec generation
+# S9 - gRPC and OpenAPI Families with Generation
 
-## Objectif
+## Objective
 
-Ajouter les integrations typees compile-time pour gRPC et OpenAPI afin de reduire les erreurs d'integration.
+Add compile-time typed integrations for gRPC and OpenAPI to reduce integration errors.
 
-## Perimetre
+## Scope
 
 IN:
 
-- Action family gRPC.
-- Generation clients depuis proto.
-- Action family OpenAPI.
-- Generation clients depuis specs OpenAPI.
+- gRPC action family.
+- client generation from proto.
+- OpenAPI action family.
+- client generation from OpenAPI specs.
 
 OUT:
 
-- streaming natif (hors scope v0.1).
+- native streaming (out of v0.1 scope).
 
-## References spec
+## Spec References
 
-- action-grpc.md
-- action-openapi.md
-- relang-actions-proposal.md
+- `action-grpc.md`
+- `action-openapi.md`
+- `relang-actions-proposal.md`
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Definir pipeline de generation code:
-   - input spec,
+1. Define code-generation pipeline:
+   - spec input,
    - validation,
-   - generation stubs ReLang.
-2. Implementer family gRPC:
+   - ReLang stub generation.
+2. Implement gRPC family:
    - unary calls,
    - metadata,
    - credentials,
-   - map erreurs `GrpcError`.
-3. Implementer family OpenAPI:
-   - operationId -> methodes,
-   - types request/response,
-   - map erreurs `OpenApiError`.
-4. Integrer generation dans build.
-5. Ajouter cache generation et invalidation par hash spec.
-6. Ajouter diagnostics de generation:
-   - spec invalide,
-   - operationId duplique,
-   - schema non supporte.
+   - `GrpcError` mapping.
+3. Implement OpenAPI family:
+   - operationId -> methods,
+   - typed request/response,
+   - `OpenApiError` mapping.
+4. Integrate generation into build.
+5. Add generation cache with spec-hash invalidation.
+6. Add generation diagnostics:
+   - invalid spec,
+   - duplicate operationId,
+   - unsupported schema.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Tooling generation stable.
-- Families gRPC/OpenAPI exploitables.
+1. Require precise generation diagnostics with:
+   - source spec file,
+   - JSON/YAML/Proto path,
+   - line/column when available.
+2. Categorize failures:
+   - spec parse,
+   - schema validation,
+   - unsupported type mapping.
+3. Add concrete `help:` guidance:
+   - operationId fix,
+   - supported alternative schema,
+   - exact spec section to modify.
+4. Add stable diagnostic codes for generator failures (tooling/CI).
+5. Add generation DX tests:
+   - build failure must be understandable in one pass without manual debugging.
 
-## Tests obligatoires
+## Deliverables
 
-- generation proto simple.
-- generation openapi simple.
-- appel gRPC succes + erreur status.
-- appel OpenAPI succes + ApiError.
-- build echec propre sur spec invalide.
+- Stable generation tooling.
+- Usable gRPC/OpenAPI families.
 
-## Risques et garde-fous
+## Mandatory Tests
 
-Risque: specs reelles tres heterogenes.
+- simple proto generation.
+- simple OpenAPI generation.
+- gRPC success + error status call.
+- OpenAPI success + ApiError call.
+- clean build failure on invalid spec.
 
-Garde-fou:
+## Risks and Safeguards
 
-- mode strict + rapport des limitations.
+Risk: real-world specs are highly heterogeneous.
 
-Risque: dette maintenance generateur.
+Safeguard:
 
-Garde-fou:
+- strict mode + explicit limitation report.
 
-- separation claire:
-  - parser spec,
-  - modele intermediaire,
-  - renderer code.
+Risk: long-term generator maintenance debt.
+
+Safeguard:
+
+- clear separation:
+  - spec parser,
+  - intermediate model,
+  - code renderer.
 
 ## Definition of Done
 
-- generation reproductible.
-- families gRPC/OpenAPI conformes v0.1.
+- reproducible generation.
+- gRPC/OpenAPI families compliant with v0.1.
 
-## Gate governance de fin de sprint
+## End-of-Sprint Governance Gate
 
-Obligatoire avant cloture:
+Mandatory before closure:
 
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).

@@ -197,7 +197,7 @@ Every execution has access to its context via `self`:
 fn example(): Info {
     Info {
         id: self.id,
-        createdAt: self.createdAt,
+        startedAt: self.startedAt,
         parentId: self.parentId
     }
 }
@@ -206,7 +206,7 @@ fn example(): Info {
 | Property | Type | Description |
 |----------|------|-------------|
 | `self.id` | `String` | Current execution id |
-| `self.createdAt` | `Timestamp` | When execution started |
+| `self.startedAt` | `Timestamp` | When execution started |
 | `self.parentId` | `String?` | Parent execution id (`none` if root) |
 
 ### 4.2 Context Inheritance
@@ -229,17 +229,9 @@ fn main(): Unit {
 - Spawned calls get a new `self` with new id
 - Spawned calls have `self.parentId` referencing the parent's `self.id`
 
-### 4.3 Explicit Execution ID (Idempotency)
+### 4.3 Execution ID (Idempotency)
 
-```relang
-@executionId("order-${orderId}")
-fn processOrder(orderId: String): OrderResult {
-    // If execution with this ID exists, return its result
-}
-
-spawn processOrder("123")  // uses id "order-123"
-spawn processOrder("123")  // returns existing result (idempotent)
-```
+TODO: function process ID should be deterministic based on parent id and a incrementing counter, to enable idempotent spawns and easier debugging.
 
 ---
 

@@ -38,7 +38,9 @@ import java.util.Set;
 public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
     private final List<TypeError> errors = new ArrayList<>();
+    private final Set<DiagnosticKey> emittedDiagnostics = new HashSet<>();
     private final Map<String, FunctionSignature> functionSignatures = new HashMap<>();
+    private final Map<String, SourceRange> outOfScopeDeclarations = new HashMap<>();
     private Scope currentScope = new Scope(null);
     private ReLangType currentFunctionReturnType = null;
     private boolean insideLoop = false;
@@ -97,6 +99,10 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             return false;
         }
 
+        Map<String, SourceRange> localDeclarations() {
+            return declarations;
+        }
+
         /** Update an existing variable (walks up scope chain). Returns false if not found. */
         boolean assign(String name, ReLangType type) {
             if (variables.containsKey(name)) {
@@ -107,6 +113,8 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             return false;
         }
     }
+
+    private record DiagnosticKey(String code, int line, int column) {}
 
     record FunctionSignature(
             String name,
@@ -130,6 +138,9 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
      * @return list of type errors (empty if code is well-typed)
      */
     public List<TypeError> check(ReLangParser.SourceContext tree) {
+        emittedDiagnostics.clear();
+        outOfScopeDeclarations.clear();
+
         // Pass 0: collect user type declarations
         for (var typeDecl : tree.typeDecl()) {
             collectTypeDeclaration(typeDecl);
@@ -155,6 +166,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         var topScope = new Scope(null);
         currentScope = topScope;
         currentFunctionReturnType = null;
+        outOfScopeDeclarations.clear();
         for (var cmd : tree.command()) {
             visit(cmd.statement());
         }
@@ -375,6 +387,8 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     private void inferReturnType(String name, FunctionSignature sig,
                                   ReLangParser.BlockContext blockCtx,
                                   ReLangParser.ExprContext exprCtx) {
+        outOfScopeDeclarations.clear();
+
         // Mark as currently inferring to detect recursion
         inferring.add(name);
 
@@ -415,6 +429,8 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     // ---- Pass 2: Function body checking ----
 
     private void checkFunctionBody(ReLangParser.FunctionContext func) {
+        outOfScopeDeclarations.clear();
+
         switch (func) {
             case ReLangParser.FunctionBlockContext fb -> {
                 var sig = functionSignatures.get(fb.ID().getText());
@@ -664,7 +680,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         var name = ctx.ID().getText();
         var type = currentScope.lookup(name);
         if (type == null) {
-            addError(ctx, TypeDiagnostics.undefinedVariable(name));
+            addUndefinedOrOutOfScopeError(ctx, name);
             return ReLangType.UnknownType.INSTANCE;
         }
         return type;
@@ -686,50 +702,95 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             return ReLangType.UnknownType.INSTANCE;
         }
 
-        // Count args
-        int argCount = 0;
-        if (ctx.callArguments() != null) {
-            argCount = ctx.callArguments().callArg().size();
-        }
-
-        // Check arity
-        if (argCount < sig.requiredCount()) {
+        var expectedSignature = signatureFor(sig);
+        var callArgs = ctx.callArguments() != null ? ctx.callArguments().callArg() : List.<ReLangParser.CallArgContext>of();
+        var argCount = callArgs.size();
+        var parameterCount = sig.params().size();
+        if (argCount > parameterCount) {
             addError(
                     ctx,
-                    TypeDiagnostics.arityAtLeast(funcName, sig.requiredCount(), argCount),
-                    declarationNote("Function declared here", sig.declarationRange())
-            );
-        } else if (argCount > sig.params().size()) {
-            addError(
-                    ctx,
-                    TypeDiagnostics.arityAtMost(funcName, sig.params().size(), argCount),
+                    TypeDiagnostics.arityAtMost(funcName, parameterCount, argCount, expectedSignature),
                     declarationNote("Function declared here", sig.declarationRange())
             );
         }
 
-        // Check arg types (positional only for now - named args don't change this logic much)
-        if (ctx.callArguments() != null) {
-            var callArgs = ctx.callArguments().callArg();
-            for (int i = 0; i < callArgs.size() && i < sig.params().size(); i++) {
-                var argExpr = switch (callArgs.get(i)) {
-                    case ReLangParser.CallArgPositionalContext pos -> pos.expr();
-                    case ReLangParser.CallArgNamedContext named -> named.expr();
-                    default -> null;
-                };
-                if (argExpr != null) {
-                    var argType = visit(argExpr);
-                    var paramType = sig.params().get(i).type();
-                    if (!(paramType instanceof ReLangType.UnknownType) && !(argType instanceof ReLangType.UnknownType)) {
-                        if (!argType.isAssignableTo(paramType)) {
-                            var parameterRange = sig.params().get(i).declarationRange();
-                            addError(
-                                    ctx,
-                                    TypeDiagnostics.argumentTypeMismatch(funcName, i + 1, paramType, argType),
-                                    declarationNote("Parameter declared here", parameterRange)
-                            );
-                        }
+        var assigned = new boolean[parameterCount];
+        var boundArguments = new ReLangParser.ExprContext[parameterCount];
+        var seenNamed = false;
+        var nextPositional = 0;
+
+        for (var callArg : callArgs) {
+            switch (callArg) {
+                case ReLangParser.CallArgPositionalContext positional -> {
+                    if (seenNamed) {
+                        addError(callArg, TypeDiagnostics.positionalAfterNamedArgument(funcName, expectedSignature));
+                        continue;
                     }
+                    if (nextPositional >= parameterCount) {
+                        continue;
+                    }
+                    assigned[nextPositional] = true;
+                    boundArguments[nextPositional] = positional.expr();
+                    nextPositional++;
                 }
+                case ReLangParser.CallArgNamedContext named -> {
+                    seenNamed = true;
+                    var argumentName = named.ID().getText();
+                    var parameterIndex = findParameterIndex(sig, argumentName);
+                    if (parameterIndex < 0) {
+                        addError(
+                                named,
+                                TypeDiagnostics.unknownNamedArgument(funcName, argumentName, expectedSignature),
+                                declarationNote("Function declared here", sig.declarationRange())
+                        );
+                        continue;
+                    }
+                    if (assigned[parameterIndex]) {
+                        addError(
+                                named,
+                                TypeDiagnostics.duplicateNamedArgument(funcName, argumentName, expectedSignature),
+                                declarationNote("Parameter declared here", sig.params().get(parameterIndex).declarationRange())
+                        );
+                        continue;
+                    }
+                    assigned[parameterIndex] = true;
+                    boundArguments[parameterIndex] = named.expr();
+                }
+                default -> {}
+            }
+        }
+
+        var assignedRequiredCount = 0;
+        for (var i = 0; i < sig.requiredCount(); i++) {
+            if (assigned[i]) {
+                assignedRequiredCount++;
+            }
+        }
+        if (assignedRequiredCount < sig.requiredCount()) {
+            addError(
+                    ctx,
+                    TypeDiagnostics.arityAtLeast(funcName, sig.requiredCount(), argCount, expectedSignature),
+                    declarationNote("Function declared here", sig.declarationRange())
+            );
+        }
+
+        for (var i = 0; i < parameterCount; i++) {
+            var argExpr = boundArguments[i];
+            if (argExpr == null) {
+                continue;
+            }
+            var argType = visit(argExpr);
+            var paramType = sig.params().get(i).type();
+            if (paramType instanceof ReLangType.UnknownType || argType instanceof ReLangType.UnknownType) {
+                continue;
+            }
+            if (!argType.isAssignableTo(paramType)) {
+                var parameterRange = sig.params().get(i).declarationRange();
+                addError(
+                        ctx,
+                        TypeDiagnostics.argumentTypeMismatch(funcName, i + 1, paramType, argType),
+                        declarationNote("Parameter declared here", parameterRange)
+                );
             }
         }
 
@@ -860,7 +921,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
         var existingType = currentScope.lookup(varName);
         if (existingType == null) {
-            addError(ctx, TypeDiagnostics.undefinedVariable(varName));
+            addUndefinedOrOutOfScopeError(ctx, varName);
         } else {
             var declarationRange = currentScope.lookupDeclaration(varName);
             // Check parameter immutability
@@ -949,6 +1010,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         visitBlock(ctx.block());
         currentScope = savedScope;
         insideLoop = savedInsideLoop;
+        registerOutOfScopeDeclarations(loopScope);
         return ReLangType.UnitType.INSTANCE;
     }
 
@@ -972,6 +1034,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         visitBlock(ctx.block());
         currentScope = savedScope;
         insideLoop = savedInsideLoop;
+        registerOutOfScopeDeclarations(loopScope);
         return ReLangType.UnitType.INSTANCE;
     }
 
@@ -992,11 +1055,17 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
     @Override
     public ReLangType visitStatementBreak(ReLangParser.StatementBreakContext ctx) {
+        if (!insideLoop) {
+            addError(ctx, TypeDiagnostics.breakOutsideLoop());
+        }
         return ReLangType.UnitType.INSTANCE;
     }
 
     @Override
     public ReLangType visitStatementContinue(ReLangParser.StatementContinueContext ctx) {
+        if (!insideLoop) {
+            addError(ctx, TypeDiagnostics.continueOutsideLoop());
+        }
         return ReLangType.UnitType.INSTANCE;
     }
 
@@ -1024,6 +1093,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         }
 
         currentScope = savedScope;
+        registerOutOfScopeDeclarations(blockScope);
         return lastType;
     }
 
@@ -1091,6 +1161,46 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     }
 
     // ---- Helpers ----
+
+    private static int findParameterIndex(FunctionSignature signature, String parameterName) {
+        for (var i = 0; i < signature.params().size(); i++) {
+            if (signature.params().get(i).name().equals(parameterName)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static String signatureFor(FunctionSignature signature) {
+        var params = new ArrayList<String>(signature.params().size());
+        for (var i = 0; i < signature.params().size(); i++) {
+            var parameter = signature.params().get(i);
+            var hasDefault = i >= signature.requiredCount();
+            var suffix = hasDefault ? " = ..." : "";
+            params.add(parameter.name() + ": " + parameter.type().displayName() + suffix);
+        }
+        var returnType = signature.returnType() == null ? "Unknown" : signature.returnType().displayName();
+        return signature.name() + "(" + String.join(", ", params) + "): " + returnType;
+    }
+
+    private void addUndefinedOrOutOfScopeError(org.antlr.v4.runtime.ParserRuleContext ctx, String name) {
+        var declarationRange = outOfScopeDeclarations.get(name);
+        if (declarationRange == null) {
+            addError(ctx, TypeDiagnostics.undefinedVariable(name));
+            return;
+        }
+        addError(
+                ctx,
+                TypeDiagnostics.outOfScopeVariable(name),
+                declarationNote("Variable declared here", declarationRange)
+        );
+    }
+
+    private void registerOutOfScopeDeclarations(Scope scope) {
+        for (var entry : scope.localDeclarations().entrySet()) {
+            outOfScopeDeclarations.put(entry.getKey(), entry.getValue());
+        }
+    }
 
     private void checkBoolCondition(ReLangType condType, org.antlr.v4.runtime.ParserRuleContext ctx, String keyword) {
         if (condType instanceof ReLangType.UnknownType) return;
@@ -1190,6 +1300,10 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     ) {
         int line = ctx.getStart().getLine();
         int col = ctx.getStart().getCharPositionInLine();
+        var key = new DiagnosticKey(code.value(), line, col);
+        if (!emittedDiagnostics.add(key)) {
+            return;
+        }
         var snippet = ctx.getText();
         errors.add(new TypeError(code, line, col, message, snippet, help, notes));
     }

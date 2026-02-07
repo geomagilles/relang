@@ -1,97 +1,111 @@
-# S2 - Types primitifs et optionnels
+# S2 - Primitive and Optional Types
 
-## Objectif
+## Objective
 
-Livrer un systeme de types de base fiable pour eviter les erreurs structurelles sur les sprints suivants.
+Deliver a reliable base type system to avoid structural errors in later sprints.
 
-## Perimetre
+## Scope
 
 IN:
 
 - `Int`, `Float`, `Bool`, `String`, `Bytes`, `Duration`, `Timestamp`, `Json`, `Unit`.
-- `T?` et `none`.
-- Operateurs primitifs de base.
-- Erreurs de typage fondamentales.
+- `T?` and `none`.
+- Core primitive operators.
+- Fundamental type errors.
 
 OUT:
 
-- Unions/produits avances.
-- Type narrowing complet.
+- Advanced unions/products.
+- Full type narrowing.
 - Awaitables.
 
-## References spec
+## Spec References
 
-- relang-spec-v0.1-canonique.md (section types).
-- relang-primitives-proposal.md.
-- relang-null-safety-proposal.md.
+- `relang-spec-v0.1-canonique.md` (types section).
+- `relang-primitives-proposal.md`.
+- `relang-null-safety-proposal.md`.
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Definir le modele interne des types (`RelangType`).
-2. Ajouter `OptionalType(innerType)`.
-3. Encoder `none` comme valeur langage distincte.
-4. Implementer verifications:
-   - assignation stricte,
-   - pas de coercion implicite `Int <-> Float`.
-5. Implementer operateurs:
-   - arithmetique base,
-   - comparaison meme type,
-   - erreurs cross-type.
-6. Implementer checker `if` condition must be `Bool`.
-7. Ajouter diagnostics detailles (message + position + suggestion).
-8. Ajouter tests de non-regression sur null safety.
+1. Define the internal type model (`RelangType`).
+2. Add `OptionalType(innerType)`.
+3. Encode `none` as a distinct language value.
+4. Implement checks:
+   - strict assignment,
+   - no implicit `Int <-> Float` coercion.
+5. Implement operators:
+   - base arithmetic,
+   - same-type comparison,
+   - cross-type rejection.
+6. Implement type check for `if` condition as `Bool`.
+7. Add detailed diagnostics (message + position + suggestion).
+8. Add null-safety non-regression tests.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Type checker primitif stable.
-- Runtime values pour primitives et `none`.
-- Messages d'erreur exploitables.
+1. Assign stable diagnostic codes to S2 primitive type errors (`RL2xxx`).
+2. Standardize wording:
+   - `Type mismatch: expected <Expected>, found <Actual>.`
+   - no runtime-internal jargon in user messages.
+3. Add actionable `help:` for common failures:
+   - invalid `none` assignment,
+   - non-bool condition,
+   - rejected implicit coercion.
+4. Add contextual notes when relevant:
+   - declared type vs observed type.
+5. Add S2 diagnostic snapshots:
+   - at least one snapshot per primitive error family.
 
-## Tests obligatoires
+## Deliverables
 
-Positifs:
+- Stable primitive type checker.
+- Runtime values for primitives and `none`.
+- Usable error messages.
 
-- declarations primitives valides.
-- `String?` avec `none`.
-- `??` (si active en S2) ou placeholder bloque explicitement.
+## Mandatory Tests
 
-Negatifs:
+Positive:
 
-- assigner `none` a type non-optionnel.
-- comparaison cross-type sans conversion.
-- condition `if` non bool.
+- valid primitive declarations.
+- `String?` with `none`.
+- `??` (if active in S2) or explicit placeholder rejection.
 
-## Risques et garde-fous
+Negative:
 
-Risque: confusion `Unit` vs `none`.
+- assign `none` to non-optional type.
+- cross-type comparison without conversion.
+- non-bool `if` condition.
 
-Garde-fou:
+## Risks and Safeguards
 
-- tests dedies sur semantics distinctes.
+Risk: confusion between `Unit` and `none`.
 
-Risque: conversions implicites introduites accidentellement.
+Safeguard:
 
-Garde-fou:
+- dedicated tests for distinct semantics.
 
-- tests stricts de refus de coercion implicite.
+Risk: accidental introduction of implicit conversions.
+
+Safeguard:
+
+- strict tests that reject implicit coercion.
 
 ## Definition of Done
 
-- Tous les cas primitifs spec S2 passes.
-- Erreurs de type stables et lisibles.
-- Aucun comportement implicite non specifie.
+- All S2 primitive spec cases pass.
+- Type errors are stable and readable.
+- No unspecified implicit behavior.
 
+## End-of-Sprint Governance Gate
 
-## Gate governance de fin de sprint
+Mandatory before closure:
 
-Obligatoire avant cloture:
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).
 
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+## Additional S2 Gate (Runtime Contract)
 
-## Gate supplementaire S2 (runtime-contract)
-
-- Publier `runtime-contract-v1` selon `Governance/01-runtime-contract.md`.
-- Ajouter tests de compatibilite de schema de base (lecture/ecriture).
-- Bloquer toute evolution contractuelle sans version explicite.
+- Publish `runtime-contract-v1` per `Governance/01-runtime-contract.md`.
+- Add baseline schema compatibility tests (read/write).
+- Block any contract evolution without explicit versioning.

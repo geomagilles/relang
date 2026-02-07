@@ -1,96 +1,110 @@
-# S3 - Variables, scope, controle de flux de base
+# S3 - Variables, Scope, and Basic Control Flow
 
-## Objectif
+## Objective
 
-Stabiliser les regles de binding/portee et le controle de flux necessaire au code metier.
+Stabilize binding/scope rules and the core control flow needed for real application code.
 
-## Perimetre
+## Scope
 
 IN:
 
-- `let`, reassignment locale type-safe, shadowing.
-- `if` expression, `match` minimal.
-- Boucles de base (`for`, `while`) sans features avancees.
+- `let`, type-safe local reassignment, shadowing.
+- `if` expression, minimal `match`.
+- Basic loops (`for`, `while`) without advanced features.
 
 OUT:
 
-- Exhaustivite complexe des sealed.
-- Smart casts avances.
-- Awaitables dans boucles (arrive plus tard).
+- Complex sealed exhaustiveness.
+- Advanced smart casts.
+- Awaitables inside loops (later phase).
 
-## References spec
+## Spec References
 
-- relang-variables-proposal.md
-- relang-conditionals-proposal.md
-- relang-loops-proposal.md
+- `relang-variables-proposal.md`
+- `relang-conditionals-proposal.md`
+- `relang-loops-proposal.md`
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Mapper les variables vers `FrameDescriptor` / slots Truffle.
-2. Implementer scopes lexicaux imbriques.
-3. Implementer reassignment avec verification de type statique stable.
-4. Implementer shadowing explicite par scope.
-5. Implementer `if` comme expression:
-   - branches compatibles,
-   - branche else implicite type `Unit` si usage statement.
-6. Implementer `match` minimal:
+1. Map variables to Truffle `FrameDescriptor` / slots.
+2. Implement nested lexical scopes.
+3. Implement reassignment with stable static type checks.
+4. Implement explicit shadowing by scope.
+5. Implement `if` as expression:
+   - compatible branch types,
+   - implicit `else` as `Unit` for statement usage.
+6. Implement minimal `match`:
    - literals,
    - wildcard `_`,
    - `none`.
-7. Implementer boucles:
+7. Implement loops:
    - `for ... in ...`,
    - `while Bool`,
    - `break`, `continue`.
-8. Ajouter diagnostics:
-   - variable inconnue,
-   - out-of-scope,
-   - type mismatch sur reassignment.
+8. Add diagnostics:
+   - unknown variable,
+   - out-of-scope usage,
+   - reassignment type mismatch.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Binding engine stable.
-- Noeuds AST de controle de flux.
-- Tests comportementaux sur scope.
+1. Add dedicated binding diagnostics for:
+   - unknown variable,
+   - out-of-scope variable,
+   - incompatible reassignment.
+2. Include declaration-site notes when available.
+3. Control diagnostic noise:
+   - deduplicate by `(code, range)`,
+   - avoid cascades after `UnknownType` recovery.
+4. Add priority fix hints:
+   - suggest `let <name> = ...` for missing variable.
+5. Add control-flow UX tests:
+   - `break/continue` outside loops with clear message and `help:`.
 
-## Tests obligatoires
+## Deliverables
 
-- shadowing ne fuit pas hors bloc.
-- reassignment respecte type initial.
-- `match` avec `_` fonctionne.
-- `while` refuse condition non bool.
-- `break/continue` hors boucle -> erreur compile.
+- Stable binding engine.
+- Control-flow AST nodes.
+- Scope behavior tests.
 
-## Risques et garde-fous
+## Mandatory Tests
 
-Risque: etats de frame incoherents en boucles.
+- shadowing does not leak outside block.
+- reassignment respects initial type.
+- `match` with `_` works.
+- `while` rejects non-bool condition.
+- `break/continue` outside loops -> compile error.
 
-Garde-fou:
+## Risks and Safeguards
 
-- tests avec boucles imbriquees et shadowing meme nom.
+Risk: inconsistent frame state in loops.
 
-Risque: `match` ambigu.
+Safeguard:
 
-Garde-fou:
+- tests with nested loops and same-name shadowing.
 
-- priorite d'evaluation d'armes documentee et testee.
+Risk: ambiguous `match` behavior.
+
+Safeguard:
+
+- document and test arm evaluation priority.
 
 ## Definition of Done
 
-- Scope/variables deterministes.
-- Controle de flux de base stable.
-- Erreurs compile-time precises.
+- Deterministic scope/variable behavior.
+- Stable basic control flow.
+- Precise compile-time errors.
 
+## End-of-Sprint Governance Gate
 
-## Gate governance de fin de sprint
+Mandatory before closure:
 
-Obligatoire avant cloture:
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).
 
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+## Additional S3 Gate (Conformance Matrix)
 
-## Gate supplementaire S3 (conformance matrix)
-
-- Creer `conformance-matrix-v0.1.csv` selon `Governance/02-conformance-matrix.md`.
-- Relier chaque requirement implementee a au moins un test.
-- Integrer un check CI qui echoue si un `MUST` touche n'a pas de statut.
+- Create `conformance-matrix-v0.1.csv` per `Governance/02-conformance-matrix.md`.
+- Link each implemented requirement to at least one test.
+- Add a CI check that fails if a touched `MUST` requirement has no status.

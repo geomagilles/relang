@@ -1,63 +1,64 @@
-# Plan d'implementation ReLang v0.1 sur Truffle
+# ReLang v0.1 Implementation Plan on Truffle
 
-Ce dossier contient un plan d'execution S1 a S11, orientee features, avec un niveau de detail suffisant pour deleguer l'implementation a une equipe.
+This folder contains an S1 to S11 execution plan organized by feature, with enough detail to delegate implementation to a team.
 
-## Hypotheses d'architecture (verrouillees)
+## Architecture Assumptions (Locked)
 
-- Runtime: Truffle AST classique (pas Bytecode DSL au depart).
-- Execution model: snapshot-first, sans replay applicatif complet.
-- Durabilite: introduite tot (S5) et etendue ensuite.
-- Contrat normatif prioritaire:
-  - relang-spec-v0.1-canonique.md
-  - relang-failures-proposal.md
+- Runtime: classic Truffle AST (no Bytecode DSL at the beginning).
+- Execution model: snapshot-first, without full application replay.
+- Durability: introduced early (S5) and extended later.
+- Priority normative contract:
+  - `relang-spec-v0.1-canonique.md`
+  - `relang-failures-proposal.md`
 
-## Regles de pilotage transverses
+## Cross-Phase Delivery Rules
 
-- Aucune feature n'est "Done" sans:
-  - parser + typer + runtime + tests.
-- Toute feature liee a `await` doit inclure:
-  - test checkpoint/resume,
-  - test propagation `Failure`.
-- Toute evolution de schema runtime doit inclure:
-  - version explicite,
-  - test migration ou test de refus de resume.
-- Gate obligatoire de fin de sprint:
-  - revue `spec-delta`,
-  - mise a jour conformance matrix,
-  - validation des risques ouverts.
+- No feature is considered done without:
+  - parser + type checker + runtime + tests.
+- Any `await`-related feature must include:
+  - checkpoint/resume tests,
+  - `Failure` propagation tests.
+- Any runtime schema evolution must include:
+  - explicit versioning,
+  - migration test or explicit resume-rejection test.
+- Mandatory end-of-sprint gate:
+  - `spec-delta` review,
+  - conformance matrix update,
+  - open-risk review.
 
-## Convention de backlog
+## Backlog Convention
 
-Chaque phase Sx inclut:
+Each Sx phase includes:
 
-1. Objectif.
-2. Perimetre IN / OUT.
-3. Sequence d'implementation (ordre strict).
-4. Livrables attendus.
-5. Tests obligatoires.
-6. Risques et garde-fous.
-7. Definition of Done (DoD).
+1. Objective.
+2. Scope IN / OUT.
+3. Implementation sequence (strict order).
+4. Explicit Error Management and DevEx Tasks.
+5. Expected deliverables.
+6. Mandatory tests.
+7. Risks and safeguards.
+8. Definition of Done (DoD).
 
-## Milestones critiques
+## Critical Milestones
 
-- M1 (fin S4): langage synchrone stable (sans awaitables complets).
-- M2 (fin S6): coeur durable (`await`, checkpoint/resume, failures, coordination, timer/signal).
-- M3 (fin S7): frontiere distribuee `spawn` stable.
-- M4 (fin S10): familles d'actions principales + observabilite + hardening.
-- M5 (fin S11): diagnostics and developer experience at world-class quality bar.
+- M1 (end of S4): stable synchronous language (without full awaitables).
+- M2 (end of S6): durable core (`await`, checkpoint/resume, failures, coordination, timer/signal).
+- M3 (end of S7): stable distributed `spawn` boundary.
+- M4 (end of S10): major action families + observability + hardening.
+- M5 (end of S11): diagnostics and developer experience at world-class quality bar.
 
-## Idees pour augmenter les chances de succes
+## Success Multipliers
 
-1. Crer un "Conformance Suite" des le S2 et l'alimenter a chaque sprint.
-2. Mettre un "golden trace" runtime en S5 pour comparer les transitions d'etat.
-3. Ajouter une revue "spec-delta" en fin de sprint:
-   - ce qui est conforme,
-   - ce qui diverge,
-   - decision explicite (acceptation ou correction).
-4. Isoler un module `runtime-contract` (types snapshots, failure envelope, execution refs) fige tot.
-5. Interdire les refactors structurels sur snapshots apres S6 sans RFC interne.
+1. Create a conformance suite in S2 and extend it every sprint.
+2. Add a runtime golden trace in S5 to compare state transitions.
+3. Add a sprint-end `spec-delta` review:
+   - what is compliant,
+   - what diverges,
+   - explicit decision (accept or fix).
+4. Isolate a `runtime-contract` module (snapshot types, failure envelope, execution refs) early.
+5. Forbid structural snapshot refactors after S6 without an internal RFC.
 
-## Pack Governance (a appliquer)
+## Governance Pack (Mandatory)
 
 - `Governance/01-runtime-contract.md`
 - `Governance/02-conformance-matrix.md`
@@ -66,11 +67,11 @@ Chaque phase Sx inclut:
 - `Governance/05-snapshot-rfc-policy.md`
 - `Governance/06-diagnostic-quality-playbook.md`
 
-## Integration des ameliorations dans le planning
+## Planning Integration
 
-- S2: `runtime-contract` versionne et fige.
-- S3: conformance matrix activee en gate.
-- S5: golden resume tests obligatoires.
-- S6+: snapshot RFC policy obligatoire.
-- S1-S10: spec-delta review obligatoire en fin de sprint.
-- S11: diagnostic quality playbook + diagnostic snapshots as merge gates.
+- S2: version and lock `runtime-contract`.
+- S3: activate conformance matrix as a gate.
+- S5: enforce golden resume tests.
+- S6+: enforce snapshot RFC policy.
+- S1-S10: enforce `spec-delta` review at sprint end.
+- S11: enforce diagnostic quality playbook + diagnostic snapshots as merge gates.

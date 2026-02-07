@@ -1,89 +1,108 @@
-# S8 - Framework d'actions + famille HTTP
+# S8 - Action Framework and HTTP Family
 
-## Objectif
+## Objective
 
-Fournir la premiere famille d'effets externes complete sur une base d'action families robuste.
+Deliver the first complete external effect family on top of a robust action-family foundation.
 
-## Perimetre
+## Scope
 
 IN:
 
-- Infra commune action family.
-- Contrat erreurs de famille.
-- HTTP action family complete v0.1.
-- Idempotency key.
-- Cancellation best-effort.
+- shared action-family infrastructure.
+- family-level error contract.
+- complete HTTP action family for v0.1.
+- idempotency key support.
+- best-effort cancellation.
 
 OUT:
 
-- gRPC/OpenAPI/shell/container (S9-S10).
+- gRPC/OpenAPI/shell/container families (S9-S10).
 
-## References spec
+## Spec References
 
-- relang-actions-proposal.md
-- action-http.md
-- relang-failures-proposal.md
+- `relang-actions-proposal.md`
+- `action-http.md`
+- `relang-failures-proposal.md`
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Definir interface interne `ActionExecutor`:
+1. Define internal `ActionExecutor` interface:
    - validate input,
    - execute,
    - map error,
    - produce awaitable result.
-2. Definir registre de familles d'actions.
-3. Implementer mapping erreur famille -> `ActionError` scelle.
-4. Implementer HTTP API:
+2. Define action-family registry.
+3. Implement family error mapping -> sealed `ActionError`.
+4. Implement HTTP API:
    - methods,
    - options,
    - auth,
    - output modes.
-5. Implementer mapping erreurs HTTP:
+5. Implement HTTP error mapping:
    - timeout,
-   - dns,
+   - DNS,
    - status,
    - protocol.
-6. Integrer idempotency key.
-7. Integrer cancellation best-effort (etat observables).
-8. Ajouter instrumentation de latence + attempts.
+6. Integrate idempotency key.
+7. Integrate best-effort cancellation (observable state).
+8. Add latency + attempts instrumentation.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Action framework extensible.
-- HTTP usable en production pilote.
+1. Define a clear action-family error taxonomy:
+   - timeout,
+   - DNS,
+   - HTTP status,
+   - protocol/auth.
+2. Expose actionable diagnostics with:
+   - endpoint,
+   - method,
+   - attempt count,
+   - idempotency key (when present).
+3. Add class-specific `help:` guidance:
+   - verify credentials,
+   - tune timeout,
+   - use retry/fallback.
+4. Add stable mapping from family errors to diagnostic codes.
+5. Add HTTP error DX tests:
+   - readable message + essential technical details, without noise.
 
-## Tests obligatoires
+## Deliverables
 
-- HTTP 2xx succes.
+- Extensible action framework.
+- HTTP family usable in pilot production.
+
+## Mandatory Tests
+
+- HTTP 2xx success.
 - HTTP non-2xx -> `ActionFailed`/`HttpStatus`.
 - timeout pattern via `or timer(...)`.
-- idempotency key meme resultat.
-- cancellation avant completion.
+- idempotency key returns same result.
+- cancellation before completion.
 
-## Risques et garde-fous
+## Risks and Safeguards
 
-Risque: rendre HTTP special-case et casser extensibilite.
+Risk: making HTTP a special case and breaking extensibility.
 
-Garde-fou:
+Safeguard:
 
-- imposer contrat commun family d'abord, HTTP ensuite.
+- enforce common family contract first, HTTP implementation second.
 
-Risque: erreurs pauvres en diagnostic.
+Risk: poor diagnostics on action failures.
 
-Garde-fou:
+Safeguard:
 
-- enrichir `attempts` et conserver details runtime relies a `failure.id`.
+- enrich `attempts` and keep runtime details linked to `failure.id`.
 
 ## Definition of Done
 
-- HTTP family complete selon spec v0.1.
-- infra actions reutilisable pour S9/S10.
+- HTTP family complete per v0.1 spec.
+- Action infrastructure reusable for S9/S10.
 
+## End-of-Sprint Governance Gate
 
-## Gate governance de fin de sprint
+Mandatory before closure:
 
-Obligatoire avant cloture:
-
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).

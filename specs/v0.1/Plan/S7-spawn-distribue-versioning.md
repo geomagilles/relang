@@ -1,87 +1,106 @@
-# S7 - `spawn`, frontiere distribuee, versioning resume
+# S7 - `spawn`, Distributed Boundary, and Resume Versioning
 
-## Objectif
+## Objective
 
-Introduire la frontiere d'execution distribuee sans casser le contrat de durabilite.
+Introduce the distributed execution boundary without breaking the durability contract.
 
-## Perimetre
+## Scope
 
 IN:
 
 - `spawn f(...)` -> `*T`.
-- Execution enfant avec `self.id`, `self.parentId`.
-- Wrapping `FunctionFailed(cause=...)` cote parent.
-- Politique `codeVersion` / `stateVersion` minimale.
+- child execution with `self.id`, `self.parentId`.
+- parent-side wrapping `FunctionFailed(cause=...)`.
+- minimal `codeVersion` / `stateVersion` policy.
 
 OUT:
 
-- scheduler production complexe multi-region.
-- migration etendue multi-versions.
+- complex production multi-region scheduler.
+- full multi-version migration.
 
-## References spec
+## Spec References
 
-- relang-spec-v0.1-canonique.md (spawn + versioning)
-- relang-execution-model.md
-- relang-failures-proposal.md
+- `relang-spec-v0.1-canonique.md` (spawn + versioning)
+- `relang-execution-model.md`
+- `relang-failures-proposal.md`
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Implementer plan de lancement enfant:
+1. Implement child-launch plan:
    - new execution id,
-   - parentId renseigne,
-   - args serializes.
-2. Implementer scheduler local puis abstraction scheduler distribue.
-3. Implementer `await spawn`:
-   - succes enfant -> valeur,
-   - echec enfant -> `FunctionFailed` avec `cause`.
-4. Impl. cancellation best-effort des enfants losers dans `or`.
-5. Ajouter metadata version:
-   - `codeVersion` attachee a execution,
-   - `stateVersion` snapshot.
-6. Au resume:
-   - meme `codeVersion` -> OK,
-   - sinon refus explicite (tant que migration absente).
-7. Ajouter hooks migration state (stubs) pour S8+.
+   - parentId set,
+   - serialized args.
+2. Implement local scheduler, then abstract distributed scheduler.
+3. Implement `await spawn`:
+   - child success -> value,
+   - child failure -> `FunctionFailed` with `cause`.
+4. Implement best-effort cancellation of losing children in `or`.
+5. Add version metadata:
+   - `codeVersion` attached to execution,
+   - `stateVersion` on snapshot.
+6. On resume:
+   - same `codeVersion` -> OK,
+   - otherwise explicit refusal (until migration exists).
+7. Add state migration hooks (stubs) for S8+.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Pipeline parent/enfant execute et observable.
-- Propagation cross-boundary conforme.
-- Gate versioning active.
+1. Add dedicated distributed diagnostics for:
+   - child `FunctionFailed`,
+   - `codeVersion/stateVersion` incompatibility,
+   - cross-version resume refusal.
+2. Add parent/child correlation in errors:
+   - `self.id`,
+   - `parentId`,
+   - child execution id.
+3. Add operations-oriented `help:`:
+   - migration required,
+   - version rollback,
+   - clean re-run strategy.
+4. Ensure cross-boundary errors preserve:
+   - stable code,
+   - readable causality.
+5. Add DX regression tests for parent/child/grandchild chains.
 
-## Tests obligatoires
+## Deliverables
 
-- parent spawn enfant succes.
-- parent spawn enfant echec -> wrapper `FunctionFailed`.
-- chain parent->child->grandchild preserve cause.
-- resume refuse si `codeVersion` incompatible.
+- Observable parent/child execution pipeline.
+- Compliant cross-boundary propagation.
+- Active versioning gate.
 
-## Risques et garde-fous
+## Mandatory Tests
 
-Risque: confusion inline vs distribue.
+- parent spawn child success.
+- parent spawn child failure -> `FunctionFailed` wrapper.
+- parent->child->grandchild chain preserves cause.
+- resume rejected on incompatible `codeVersion`.
 
-Garde-fou:
+## Risks and Safeguards
 
-- tests mirroirs:
-  - `f(...)` inline,
+Risk: confusion between inline and distributed execution.
+
+Safeguard:
+
+- mirrored tests:
+  - inline `f(...)`,
   - `await spawn f(...)`,
-  comparer shape des failures.
+  compare failure shape.
 
-Risque: coupling fort au scheduler.
+Risk: tight coupling to scheduler implementation.
 
-Garde-fou:
+Safeguard:
 
-- interface scheduler injectable + fake testable.
+- injectable scheduler interface + test fake.
 
 ## Definition of Done
 
-- `spawn` stable et conforme.
-- Frontiere d'execution observable et testee.
+- `spawn` is stable and compliant.
+- Distributed execution boundary is observable and tested.
 
-## Gate governance de fin de sprint
+## End-of-Sprint Governance Gate
 
-Obligatoire avant cloture:
+Mandatory before closure:
 
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).

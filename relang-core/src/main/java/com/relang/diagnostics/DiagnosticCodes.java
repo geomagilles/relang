@@ -32,6 +32,9 @@ public final class DiagnosticCodes {
     public static final DiagnosticCode TYPE_INVALID_CONDITION = new DiagnosticCode("RL2013", DiagnosticCategory.TYPE, "Invalid condition type");
     public static final DiagnosticCode TYPE_INVALID_INTERPOLATION = new DiagnosticCode("RL2014", DiagnosticCategory.TYPE, "Invalid string interpolation");
     public static final DiagnosticCode TYPE_INVALID_MATCH_PATTERN = new DiagnosticCode("RL2015", DiagnosticCategory.TYPE, "Invalid match pattern");
+    public static final DiagnosticCode TYPE_UNKNOWN_NAMED_ARGUMENT = new DiagnosticCode("RL2016", DiagnosticCategory.TYPE, "Unknown named argument");
+    public static final DiagnosticCode TYPE_INVALID_CONTROL_FLOW = new DiagnosticCode("RL2017", DiagnosticCategory.TYPE, "Invalid control flow usage");
+    public static final DiagnosticCode TYPE_OUT_OF_SCOPE_VARIABLE = new DiagnosticCode("RL2018", DiagnosticCategory.TYPE, "Out-of-scope variable");
 
     // RL3xxx: runtime diagnostics
     public static final DiagnosticCode RUNTIME_GENERIC = new DiagnosticCode("RL3000", DiagnosticCategory.RUNTIME, "Runtime error");
@@ -64,6 +67,9 @@ public final class DiagnosticCodes {
             TYPE_INVALID_CONDITION,
             TYPE_INVALID_INTERPOLATION,
             TYPE_INVALID_MATCH_PATTERN,
+            TYPE_UNKNOWN_NAMED_ARGUMENT,
+            TYPE_INVALID_CONTROL_FLOW,
+            TYPE_OUT_OF_SCOPE_VARIABLE,
             RUNTIME_GENERIC,
             RUNTIME_INVALID_OPERATION,
             RUNTIME_UNKNOWN_FUNCTION,

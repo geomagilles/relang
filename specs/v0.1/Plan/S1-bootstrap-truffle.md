@@ -1,89 +1,106 @@
-# S1 - Bootstrap Truffle et pipeline minimal
+# S1 - Truffle Bootstrap and Minimal Pipeline
 
-## Objectif
+## Objective
 
-Poser un socle executable et testable pour le langage, sans dette de structure qui bloquera les phases suivantes.
+Establish an executable and testable foundation for the language without structural debt that would block later phases.
 
-## Perimetre
+## Scope
 
 IN:
 
 - `TruffleLanguage` + `Context`.
-- Parse minimal d'un module.
-- `RootNode` executable.
-- Harness de tests.
-- CI locale basique (build + test).
+- Minimal module parsing.
+- Executable `RootNode`.
+- Test harness.
+- Basic local CI (build + test).
 
 OUT:
 
-- Typage avance.
+- Advanced type system.
 - Awaitables.
 - Snapshots.
-- Actions externes.
+- External action families.
 
-## Pre-requis
+## Prerequisites
 
-- JDK/GraalVM version verrouillee.
-- Build system configure (Gradle/Maven).
-- Convention package et dossiers fixee.
+- Locked JDK/GraalVM version.
+- Configured build system (Gradle/Maven).
+- Agreed package/folder conventions.
 
-## Sequence d'implementation (ordre strict)
+## Implementation Sequence (Strict Order)
 
-1. Creer le module runtime langage.
-2. Implementer la classe `RelangLanguage extends TruffleLanguage<RelangContext>`.
-3. Implementer `RelangContext` (config minimale, services mockables).
-4. Definir `RelangRootNode` et un `EvalRootNode` de test.
-5. Ajouter un parser temporaire minimal (retourne AST constant).
-6. Brancher `parse(...)` -> `CallTarget`.
-7. Ajouter CLI dev minimale: `run/check`.
-8. Ajouter tests smoke:
-   - parse module vide,
-   - execution d'une expression constante,
-   - erreurs parse minimales.
-9. Ajouter scripts CI locales (build + test + lint si present).
+1. Create the language runtime module.
+2. Implement `RelangLanguage extends TruffleLanguage<RelangContext>`.
+3. Implement `RelangContext` (minimal config, mockable services).
+4. Define `RelangRootNode` and one test `EvalRootNode`.
+5. Add a temporary minimal parser (returns a constant AST).
+6. Wire `parse(...)` -> `CallTarget`.
+7. Add minimal developer CLI: `run/check`.
+8. Add smoke tests:
+   - empty module parse,
+   - constant expression execution,
+   - basic parse failures.
+9. Add local CI scripts (build + test + lint if present).
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Language bootstrap compilable.
-- Suite smoke automatisable.
-- Document d'architecture courte (1 page) sur separation parser/typer/runtime.
+1. Define the baseline diagnostic contract:
+   - stable code,
+   - severity,
+   - primary range,
+   - user-facing message.
+2. Standardize minimal S1 parse error wording:
+   - `Expected <X>, found <Y>` when possible,
+   - no raw ANTLR internal phrasing exposed directly.
+3. Expose coherent CLI rendering for bootstrap errors:
+   - code + message + position.
+4. Add a DX non-regression test:
+   - parse errors must be readable without Java stacktrace noise.
+5. Document the error flow in one short page:
+   - parser -> diagnostic -> CLI/tool rendering.
+   - reference: `Governance/07-parser-diagnostic-flow.md`.
 
-## Tests obligatoires
+## Deliverables
+
+- Compilable language bootstrap.
+- Automatable smoke suite.
+- Short architecture note (1 page) on parser/typechecker/runtime separation.
+
+## Mandatory Tests
 
 - `empty_module_executes`.
 - `constant_expression_executes`.
 - `invalid_source_returns_parse_error`.
 - `context_created_once_per_execution`.
 
-## Risques et garde-fous
+## Risks and Safeguards
 
-Risque: melanger parse, typer et runtime trop tot.
+Risk: mixing parser, type checker, and runtime concerns too early.
 
-Garde-fou:
+Safeguard:
 
-- interfaces separees:
-  - `Parser` -> AST brut,
-  - `TypeChecker` -> AST annote,
-  - `Executor` -> noeuds runtime.
+- strict interfaces:
+  - `Parser` -> raw AST,
+  - `TypeChecker` -> annotated AST,
+  - `Executor` -> runtime nodes.
 
-Risque: tests fragiles relies a des details d'implementation.
+Risk: brittle tests tied to internal implementation details.
 
-Garde-fou:
+Safeguard:
 
-- tester les comportements observables, pas les classes internes.
+- test observable behavior, not internal classes.
 
 ## Definition of Done
 
-- Projet compile proprement.
-- 100% tests S1 verts.
-- `run` execute un programme trivial.
-- Structure des modules validee par revue tech.
+- Project compiles cleanly.
+- 100% of S1 tests are green.
+- `run` executes a trivial program.
+- Module structure validated in technical review.
 
+## End-of-Sprint Governance Gate
 
-## Gate governance de fin de sprint
+Mandatory before closure:
 
-Obligatoire avant cloture:
-
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).

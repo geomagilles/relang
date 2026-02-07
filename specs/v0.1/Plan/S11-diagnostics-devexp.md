@@ -31,7 +31,7 @@ OUT:
 
 ## Success Metrics
 
-1. 100% of parse/type diagnostics have:
+1. 100% of parse/type/runtime diagnostics have:
    - stable code,
    - primary message,
    - at least one precise range.
@@ -75,6 +75,21 @@ Add parser diagnostic translation from ANTLR internals to user vocabulary:
 - convert token names into language terms (`identifier`, `expression`, `')'`),
 - rewrite `"mismatched input"` into `Expected <X>, found <Y>`,
 - attach context-sensitive hints.
+
+## Explicit Error Management and DevEx Tasks
+
+1. Keep parser/type/runtime diagnostics in dedicated builders only (no ad-hoc wording in feature code paths).
+2. Require stable code + primary range + user-facing message for every new error path.
+3. Require `help:` for common user mistakes and track coverage continuously.
+4. Keep LSP payload parity with CLI:
+   - code,
+   - range,
+   - related info,
+   - quick-fix metadata when high-confidence.
+5. Enforce regression gates:
+   - diagnostic matrix scenarios,
+   - snapshot/contract tests,
+   - CI failure on uncoded diagnostics.
 
 ## Prioritized Implementation Checklist
 
@@ -169,7 +184,7 @@ Safeguards:
 
 ## Definition of Done
 
-- Structured diagnostics used by parser and type checker by default.
+- Structured diagnostics used by parser, type checker, and runtime by default.
 - CLI output includes code frame and actionable help.
 - LSP diagnostics include stable code and precise ranges.
 - Quality gates integrated into PR review and CI.

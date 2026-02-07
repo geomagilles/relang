@@ -1,98 +1,117 @@
-# S10 - Shell, Container, observabilite, hardening
+# S10 - Shell, Container, Observability, and Hardening
 
-## Objectif
+## Objective
 
-Terminer le perimetre v0.1 avec les actions systeme et verrouiller la qualite operationnelle.
+Complete the v0.1 scope with system-level action families and lock operational quality.
 
-## Perimetre
+## Scope
 
 IN:
 
-- Action family shell.
-- Action family container.
-- Instrumentation Truffle (tags standard).
-- Hardening perf + fiabilite + conformance complete.
+- shell action family.
+- container action family.
+- Truffle instrumentation (standard tags).
+- performance/reliability/conformance hardening.
 
 OUT:
 
-- extensions v0.2 (streaming, retry DSL, first-class functions).
+- v0.2 extensions (streaming, retry DSL, first-class functions).
 
-## References spec
+## Spec References
 
-- action-shell.md
-- action-container.md
-- relang-actions-proposal.md
-- relang-spec-v0.1-canonique.md
+- `action-shell.md`
+- `action-container.md`
+- `relang-actions-proposal.md`
+- `relang-spec-v0.1-canonique.md`
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Implementer family shell:
-   - `run(program,args)` safe,
-   - `command(...)` interprete,
+1. Implement shell family:
+   - safe `run(program,args)`,
+   - interpreted `command(...)`,
    - output modes,
    - successCodes,
-   - erreurs dediees.
-2. Implementer family container:
+   - dedicated errors.
+2. Implement container family:
    - run-to-completion,
-   - options ressources/mount/env,
+   - resource/mount/env options,
    - output modes,
-   - erreurs dediees.
-3. Integrer controles de securite shell:
-   - docs et warnings sur injection.
-4. Ajouter instrumentation Truffle:
+   - dedicated errors.
+3. Integrate shell safety controls:
+   - documentation and injection warnings.
+4. Add Truffle instrumentation:
    - `StatementTag`, `ExpressionTag`, `CallTag`, etc.
-5. Exposer observabilite runtime:
-   - correlation executionId/failure.id,
-   - traces de checkpoint.
-6. Lancer campagne hardening:
-   - perf micro/macro,
-   - chaos crash/resume,
-   - tests endurance.
-7. Executer conformance suite finale v0.1.
+5. Expose runtime observability:
+   - executionId/failure.id correlation,
+   - checkpoint traces.
+6. Run hardening campaign:
+   - micro/macro perf,
+   - crash/resume chaos,
+   - endurance tests.
+7. Execute final v0.1 conformance suite.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Toutes families v0.1 livrees.
-- Observabilite exploitable en operation.
-- Rapport de readiness v0.1.
+1. Define dedicated shell/container diagnostics for:
+   - unexpected exit code,
+   - timeout,
+   - cancellation,
+   - environment errors.
+2. Standardize operational error output with:
+   - diagnostic code,
+   - readable message,
+   - minimal context (command/image, attempt, executionId).
+3. Add runbook-oriented `help:`:
+   - immediate action,
+   - environment checks,
+   - escalation path.
+4. Guarantee incident-grade observability:
+   - correlation IDs visible in diagnostics.
+5. Add DevEx non-regression tests under degraded conditions:
+   - structured logs + understandable diagnostics under load.
 
-## Tests obligatoires
+## Deliverables
+
+- All v0.1 action families delivered.
+- Observability usable in operations.
+- v0.1 readiness report.
+
+## Mandatory Tests
 
 - shell success/error/timeout/cancel.
 - container success/error/timeout/cancel.
-- resume sous charge avec actions mixtes.
-- compatibilite snapshots sur jeux de donnees reels.
-- conformance matrix 100% sur MUST v0.1.
+- resume under load with mixed actions.
+- snapshot compatibility on real datasets.
+- conformance matrix at 100% for v0.1 MUST requirements.
 
-## Risques et garde-fous
+## Risks and Safeguards
 
-Risque: actions shell/container introduisent fragilite environnementale.
+Risk: shell/container actions introduce environment fragility.
 
-Garde-fou:
+Safeguard:
 
-- tests hermetiques,
-- runners dedies,
-- fixtures reproductibles.
+- hermetic tests,
+- dedicated runners,
+- reproducible fixtures.
 
-Risque: manque de visibilite en incident.
+Risk: insufficient visibility during incidents.
 
-Garde-fou:
+Safeguard:
 
-- dashboards minimaux + logs structures + correlation IDs.
+- minimal dashboards + structured logs + correlation IDs.
 
 ## Definition of Done
 
-- Suite complete v0.1 verte.
-- Rapport final:
-  - conformite spec,
-  - ecarts eventuels,
-  - plan de suivi v0.2.
+- Full v0.1 suite is green.
+- Final report includes:
+  - spec conformance,
+  - remaining deviations,
+  - v0.2 follow-up plan.
 
+## End-of-Sprint Governance Gate
 
-## Gate governance de fin de sprint
+Mandatory before closure:
 
-Obligatoire avant cloture:
-
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).

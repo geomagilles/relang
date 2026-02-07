@@ -1,93 +1,112 @@
-# S4 - Fonctions, appels inline et modules
+# S4 - Functions, Inline Calls, and Modules
 
-## Objectif
+## Objective
 
-Permettre la composition de code reelle: fonctions top-level, appels inline, imports/modules et contraintes de portabilite.
+Enable real code composition: top-level functions, inline calls, imports/modules, and portability constraints.
 
-## Perimetre
+## Scope
 
 IN:
 
-- `fn` top-level.
-- Appel inline `f(...)`.
-- Parametres nommes + valeurs par defaut.
-- Modules/imports.
-- Interdiction capture de scope par fonctions nommees.
+- top-level `fn`.
+- inline function call `f(...)`.
+- named parameters + default values.
+- modules/imports.
+- no scope capture by named functions.
 
 OUT:
 
 - `spawn`.
-- lambdas avancees.
-- fonction first-class (hors scope v0.1).
+- advanced lambdas.
+- first-class functions (out of v0.1 scope).
 
-## References spec
+## Spec References
 
-- relang-functions.md
-- relang-modules-proposal.md
-- relang-spec-v0.1-canonique.md (sections fonctions/modules)
+- `relang-functions.md`
+- `relang-modules-proposal.md`
+- `relang-spec-v0.1-canonique.md` (function/module sections)
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Implementer AST declarations `FnDecl` top-level.
-2. Implementer resolution de symboles de fonction par module.
-3. Implementer appels inline + evaluation arguments:
-   - positionnels,
-   - nommes,
-   - defaults.
-4. Interdire:
-   - fonctions imbriquees,
-   - capture de variable externe.
-5. Implementer imports:
-   - import item,
-   - import namespace,
+1. Implement top-level function declaration AST (`FnDecl`).
+2. Implement module-level function symbol resolution.
+3. Implement inline calls + argument evaluation:
+   - positional,
+   - named,
+   - default values.
+4. Reject:
+   - nested functions,
+   - external variable capture.
+5. Implement imports:
+   - item import,
+   - namespace import,
    - alias.
-6. Implementer detection cycles inter-modules.
-7. Ajouter regles de visibilite:
-   - `private` module-local.
-8. Ajouter hoisting de fonctions dans module.
+6. Implement inter-module cycle detection.
+7. Add visibility rules:
+   - `private` at module scope.
+8. Add function hoisting inside module.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Moteur de fonctions inline stable.
-- Resolution de modules/imports.
-- Contrainte self-contained enforcee.
+1. Introduce explicit diagnostics for:
+   - unknown function,
+   - unknown named argument,
+   - invalid arity,
+   - module import/cycle errors.
+2. Add contextual notes:
+   - target function declaration,
+   - target parameter declaration,
+   - cycle detection site.
+3. Add corrective `help:` guidance:
+   - rename symbol,
+   - add missing argument,
+   - fix import.
+4. Require invalid calls to show:
+   - stable code,
+   - expected signature.
+5. Add DX regression tests for inter-module symbol resolution.
 
-## Tests obligatoires
+## Deliverables
 
-- appel avant declaration (hoisting) valide.
-- capture de variable externe -> erreur compile.
-- cycle module A<->B detecte.
-- parametres nommes melanges invalides rejetes.
-- fonction nested rejetee.
+- Stable inline function execution engine.
+- Module/import resolution.
+- Enforced self-contained constraints.
 
-## Risques et garde-fous
+## Mandatory Tests
 
-Risque: resolution de symboles non deterministe.
+- call before declaration (hoisting) is valid.
+- external variable capture -> compile error.
+- module cycle A<->B detected.
+- invalid mixed named parameters rejected.
+- nested function rejected.
 
-Garde-fou:
+## Risks and Safeguards
 
-- ordre de resolution specifie:
+Risk: non-deterministic symbol resolution.
+
+Safeguard:
+
+- specified resolution order:
   1. local,
-  2. imports explicites,
+  2. explicit imports,
   3. namespace.
 
-Risque: dette de compatibilite pour `spawn`.
+Risk: compatibility debt for upcoming `spawn`.
 
-Garde-fou:
+Safeguard:
 
-- API d'appel preparee pour mode inline/distribue.
+- call API designed for both inline and distributed modes.
 
 ## Definition of Done
 
-- Fonctions inline production-ready.
-- Modules/imports robustes.
-- Regles v0.1 de portabilite respectees.
+- Inline functions are production-ready.
+- Modules/imports are robust.
+- v0.1 portability rules are enforced.
 
+## End-of-Sprint Governance Gate
 
-## Gate governance de fin de sprint
+Mandatory before closure:
 
-Obligatoire avant cloture:
-
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).

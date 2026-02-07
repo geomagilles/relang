@@ -23,6 +23,9 @@ class DiagnosticCodesTest {
         assertTrue(DiagnosticCodes.find("RL3003").isPresent());
         assertTrue(DiagnosticCodes.find("RL3004").isPresent());
         assertTrue(DiagnosticCodes.find("RL3005").isPresent());
+        assertTrue(DiagnosticCodes.find("RL2016").isPresent());
+        assertTrue(DiagnosticCodes.find("RL2017").isPresent());
+        assertTrue(DiagnosticCodes.find("RL2018").isPresent());
     }
 
     @Test

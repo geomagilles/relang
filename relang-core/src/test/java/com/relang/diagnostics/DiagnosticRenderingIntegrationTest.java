@@ -44,6 +44,7 @@ class DiagnosticRenderingIntegrationTest {
     void syntaxCode() {
         var ex = expectFailure("let broken =");
         assertTrue(ex.getMessage().contains("RL10"), "Expected RL1xxx code in message, got: " + ex.getMessage());
+        assertTrue(!ex.getMessage().contains("\tat "), "Syntax diagnostics should not include Java stacktrace noise");
     }
 
     @Test
@@ -55,10 +56,10 @@ class DiagnosticRenderingIntegrationTest {
     }
 
     @Test
-    @DisplayName("Unknown named argument emits RL3004 runtime diagnostic code")
-    void runtimeInvalidNamedArgumentCode() {
+    @DisplayName("Unknown named argument emits RL2016 compile-time diagnostic code")
+    void compileTimeInvalidNamedArgumentCode() {
         var ex = expectFailure("fn add(a: Int, b: Int): Int = a + b; add(a: 1, c: 2);");
-        assertTrue(ex.getMessage().contains("RL3004"), "Expected RL3004 in message, got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("RL2016"), "Expected RL2016 in message, got: " + ex.getMessage());
         assertTrue(ex.getMessage().contains("help:"), "Expected help hint in message, got: " + ex.getMessage());
     }
 

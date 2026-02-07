@@ -443,6 +443,26 @@ public class ReLangTypeCheckerTest {
         }
 
         @Test
+        @DisplayName("unknown named argument")
+        void testUnknownNamedArgument() {
+            var src = """
+                        fn add(a: Int, b: Int): Int { return a + b; }
+                        add(a: 1, c: 2);
+                    """;
+            assertTypeError(src, "Unknown named argument");
+        }
+
+        @Test
+        @DisplayName("positional argument after named argument is rejected")
+        void testPositionalAfterNamedArgument() {
+            var src = """
+                        fn add(a: Int, b: Int): Int { return a + b; }
+                        add(a: 1, 2);
+                    """;
+            assertTypeError(src, "Positional argument cannot appear after named arguments");
+        }
+
+        @Test
         @DisplayName("correct arity with defaults")
         void testCorrectArityWithDefaults() {
             var src = """
@@ -863,6 +883,18 @@ public class ReLangTypeCheckerTest {
         void testUndefinedParameter() {
             assertTypeError("fn f(a: Int): Int { return b; } f(1);", "Undefined variable");
         }
+
+        @Test
+        @DisplayName("Reference to block-local variable outside the block is rejected with out-of-scope diagnostic")
+        void testOutOfScopeVariable() {
+            var src = """
+                        if true {
+                            let scoped = 42;
+                        }
+                        scoped;
+                    """;
+            assertTypeError(src, "out of scope");
+        }
     }
 
     @Nested
@@ -977,6 +1009,23 @@ public class ReLangTypeCheckerTest {
                         f();
                     """;
             assertTypeError(src, "Cannot assign String");
+        }
+    }
+
+    @Nested
+    @DisplayName("Loop control flow diagnostics")
+    class LoopControlFlowDiagnostics {
+
+        @Test
+        @DisplayName("break outside loop is rejected")
+        void testBreakOutsideLoop() {
+            assertTypeError("break;", "can only be used inside a loop");
+        }
+
+        @Test
+        @DisplayName("continue outside loop is rejected")
+        void testContinueOutsideLoop() {
+            assertTypeError("continue;", "can only be used inside a loop");
         }
     }
 }

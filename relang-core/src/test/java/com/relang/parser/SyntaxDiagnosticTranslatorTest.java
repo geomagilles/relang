@@ -58,7 +58,7 @@ class SyntaxDiagnosticTranslatorTest {
         );
 
         assertEquals("RL1000", result.code().value());
-        assertEquals("totally custom parser failure", result.message());
+        assertEquals("Syntax error near oops.", result.message());
         assertTrue(result.help().contains("oops"));
     }
 }

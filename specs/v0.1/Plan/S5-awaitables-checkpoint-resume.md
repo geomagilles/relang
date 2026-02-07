@@ -1,106 +1,125 @@
-# S5 - Awaitables v1 et checkpoint/resume precoce
+# S5 - Awaitables v1 and Early Checkpoint/Resume
 
-## Objectif
+## Objective
 
-Introduire tot le coeur durable pour valider la faisabilite de snapshot/resume avant la complexite distribuee.
+Introduce the durable core early to validate snapshot/resume feasibility before distributed complexity is added.
 
-## Perimetre
+## Scope
 
 IN:
 
-- Type `*T`.
+- type `*T`.
 - `await`.
-- Table d'awaitables runtime.
-- Checkpoint sur suspension.
-- Resume depuis dernier snapshot.
+- runtime awaitable table.
+- checkpoint on suspension.
+- resume from latest snapshot.
 
 OUT:
 
-- `spawn` distribue complet.
-- familles d'actions completes.
-- coordination `and/or` avancee (arrive S6).
+- full distributed `spawn`.
+- complete action families.
+- advanced `and/or` coordination (arrives in S6).
 
-## References spec
+## Spec References
 
-- relang-spec-v0.1-canonique.md (execution + checkpoints)
-- relang-execution-model.md
-- relang-awaitables-proposal.md
+- `relang-spec-v0.1-canonique.md` (execution + checkpoints)
+- `relang-execution-model.md`
+- `relang-awaitables-proposal.md`
 
-## Sequence d'implementation
+## Implementation Sequence
 
-1. Definir `AwaitableHandle` interne:
+1. Define internal `AwaitableHandle`:
    - id,
    - createdAt,
    - status,
    - result/failure.
-2. Implementer type checker `await : *T -> T | Failure`.
-3. Implementer suspension runtime:
-   - si non resolu, checkpoint,
-   - restitution sur reprise.
-4. Definir schema snapshot v1:
+2. Implement type check rule `await : *T -> T | Failure`.
+3. Implement runtime suspension:
+   - unresolved awaitable -> checkpoint,
+   - resume continues execution.
+4. Define snapshot schema v1:
    - execution metadata,
-   - locals serializes,
-   - PC,
+   - serialized locals,
+   - program counter,
    - awaitable table.
-5. Implementer persistance snapshot (backend choisi).
-6. Implementer resume:
-   - recharge snapshot,
-   - restauration variables,
-   - continuation au bon PC.
-7. Assurer non-reexecution des effets deja resolus.
-8. Ajouter tooling test:
-   - injecter crash apres checkpoint N,
-   - reprendre et verifier resultat final identique.
+5. Implement snapshot persistence (chosen backend).
+6. Implement resume:
+   - reload snapshot,
+   - restore variables,
+   - continue at correct program counter.
+7. Guarantee no re-execution of already-resolved effects.
+8. Add testing tools:
+   - inject crash after checkpoint N,
+   - resume and verify same final result.
 
-## Livrables
+## Explicit Error Management and DevEx Tasks
 
-- Runtime durable minimal operationnel.
-- Format snapshot versionne (v1).
-- Test harness crash/resume.
+1. Define S5 runtime diagnostics (`RL3xxx`) for:
+   - invalid `await`,
+   - corrupted/incomplete snapshot,
+   - impossible resume.
+2. Attach clear remediation to each resume error:
+   - restart from valid checkpoint,
+   - verify code/schema version.
+3. Include minimal runtime context in errors:
+   - executionId,
+   - checkpoint id/index when available.
+4. Add readable CLI/LSP rendering for resume failures:
+   - code,
+   - message,
+   - help,
+   - position/source when available.
+5. Add golden error tests:
+   - crash/resume with stable, non-regressing diagnostics.
 
-## Tests obligatoires
+## Deliverables
 
-- `await` suspend puis resume correctement.
-- resultats deja resolus non rejoues.
-- locals restaurees a l'identique.
-- corruption snapshot detectee avec erreur claire.
+- Minimal operational durable runtime.
+- Versioned snapshot format (v1).
+- Crash/resume test harness.
 
-## Risques et garde-fous
+## Mandatory Tests
 
-Risque: vouloir serialiser des objets runtime Truffle non serializables.
+- `await` suspends and resumes correctly.
+- already resolved results are not replayed.
+- locals are restored exactly.
+- snapshot corruption is detected with clear diagnostics.
 
-Garde-fou:
+## Risks and Safeguards
 
-- separer strictement:
-  - etat langage serializable,
-  - objets runtime ephemeres reconstruits au resume.
+Risk: trying to serialize non-serializable Truffle runtime objects.
 
-Risque: divergences de comportement apres resume.
+Safeguard:
 
-Garde-fou:
+- strict separation between:
+  - serializable language state,
+  - ephemeral runtime objects reconstructed on resume.
 
-- golden tests "run complet" vs "run avec crash".
+Risk: behavior divergence after resume.
+
+Safeguard:
+
+- golden tests: "full run" vs "run with crash/resume".
 
 ## Definition of Done
 
-- Demonstration stable du cycle:
+- Stable demonstration of the full cycle:
   - start,
   - suspend/checkpoint,
   - crash,
   - resume,
   - complete.
 
+## End-of-Sprint Governance Gate
 
-## Gate governance de fin de sprint
+Mandatory before closure:
 
-Obligatoire avant cloture:
+- `spec-delta` report: `Governance/04-spec-delta-review.md`.
+- Conformance matrix update (status for touched requirements).
+- Open-risk validation (accepted/replanned/fixed).
 
-- Rapport spec-delta: `Governance/04-spec-delta-review.md`.
-- Mise a jour conformance matrix (statut des requirements touchees).
-- Validation des risques ouverts (acceptes/replanifies/corriges).
+## Additional S5 Gate (Golden Resume Tests)
 
-## Gate supplementaire S5 (golden resume tests)
-
-- Mettre en place le harness de crash injection.
-- Creer des golden traces sur scenarios `await` simples et en chaine.
-- Faire echouer la CI si run nominal vs run resume divergent.
+- Set up the crash-injection harness.
+- Create golden traces for simple and chained `await` scenarios.
+- Make CI fail if nominal run vs resumed run diverge.
