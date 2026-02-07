@@ -1,6 +1,6 @@
 # Plan d'implementation ReLang v0.1 sur Truffle
 
-Ce dossier contient un plan d'execution S1 a S10, orientee features, avec un niveau de detail suffisant pour deleguer l'implementation a une equipe.
+Ce dossier contient un plan d'execution S1 a S11, orientee features, avec un niveau de detail suffisant pour deleguer l'implementation a une equipe.
 
 ## Hypotheses d'architecture (verrouillees)
 
@@ -44,6 +44,7 @@ Chaque phase Sx inclut:
 - M2 (fin S6): coeur durable (`await`, checkpoint/resume, failures, coordination, timer/signal).
 - M3 (fin S7): frontiere distribuee `spawn` stable.
 - M4 (fin S10): familles d'actions principales + observabilite + hardening.
+- M5 (fin S11): diagnostics and developer experience at world-class quality bar.
 
 ## Idees pour augmenter les chances de succes
 
@@ -63,6 +64,7 @@ Chaque phase Sx inclut:
 - `Governance/03-golden-resume-tests.md`
 - `Governance/04-spec-delta-review.md`
 - `Governance/05-snapshot-rfc-policy.md`
+- `Governance/06-diagnostic-quality-playbook.md`
 
 ## Integration des ameliorations dans le planning
 
@@ -71,3 +73,4 @@ Chaque phase Sx inclut:
 - S5: golden resume tests obligatoires.
 - S6+: snapshot RFC policy obligatoire.
 - S1-S10: spec-delta review obligatoire en fin de sprint.
+- S11: diagnostic quality playbook + diagnostic snapshots as merge gates.

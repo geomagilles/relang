@@ -15,6 +15,7 @@ import com.relang.nodes.ReLangMetaType;
 import com.relang.nodes.ReLangSuspendException;
 import com.relang.nodes.ResumableState;
 import com.relang.nodes.SuspendedResult;
+import com.relang.diagnostics.InlineDiagnosticRenderer;
 import com.relang.parser.ReLangDiagnosticTruffleException;
 import com.relang.parser.ReLangSyntaxException;
 import com.relang.parser.ReLangTypeCheckException;
@@ -66,7 +67,7 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
             if (lspRequest) {
                 throw toTruffleTypeError(request, typeErrors);
             }
-            throw new ReLangTypeCheckException(typeErrors);
+            throw new ReLangTypeCheckException(typeErrors, request.getSource().getName(), sourceCode);
         }
 
         // Step 3: Build Truffle nodes
@@ -90,12 +91,13 @@ public final class ReLang extends TruffleLanguage<ReLangContext> {
 
     private static RuntimeException toTruffleSyntaxError(ParsingRequest request, ReLangSyntaxException syntaxException) {
         var firstError = syntaxException.getErrors().getFirst();
-        return toTruffleDiagnostic(request, firstError.line(), firstError.column(), firstError.sourceSnippet(), syntaxException.getMessage());
+        var message = InlineDiagnosticRenderer.render(firstError.toDiagnostic());
+        return toTruffleDiagnostic(request, firstError.line(), firstError.column(), firstError.sourceSnippet(), message);
     }
 
     private static RuntimeException toTruffleTypeError(ParsingRequest request, java.util.List<TypeError> typeErrors) {
         var firstError = typeErrors.getFirst();
-        var message = new ReLangTypeCheckException(typeErrors).getMessage();
+        var message = InlineDiagnosticRenderer.render(firstError.toDiagnostic());
         return toTruffleDiagnostic(request, firstError.line(), firstError.column(), firstError.sourceSnippet(), message);
     }
 

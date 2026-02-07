@@ -831,7 +831,7 @@ public class ReLangTypeCheckerTest {
                         let r1 = square(6)
                         let broken =
                     """;
-            var ex = assertSyntaxError(src, "mismatched input '<EOF>'");
+            var ex = assertSyntaxError(src, "Expected");
             assertFalse(ex.getMessage().contains("must have a type annotation"), "Expected syntax-only diagnostics, but got: " + ex.getMessage());
         }
     }

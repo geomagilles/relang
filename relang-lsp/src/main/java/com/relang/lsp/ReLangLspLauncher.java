@@ -1,6 +1,8 @@
 package com.relang.lsp;
 
-import org.graalvm.polyglot.Context;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 
 /**
  * Entry point for the standalone ReLang LSP server.
@@ -79,25 +81,27 @@ public final class ReLangLspLauncher {
         System.out.println("Starting ReLang LSP server on " + address + "...");
         System.out.println("Press Ctrl+C to stop.");
 
-        try (var context = Context.newBuilder("relang")
-                .allowExperimentalOptions(true)
-                .allowAllAccess(true)
-                .option("lsp", address)
-                .option("lsp.Delegates", "")
-                .build()) {
-            synchronized (context) {
-                try {
-                    context.wait();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+        try (var serverSocket = new ServerSocket()) {
+            serverSocket.bind(new InetSocketAddress(host, port));
+            while (true) {
+                var client = serverSocket.accept();
+                Thread.ofPlatform()
+                        .name("relang-lsp-session")
+                        .daemon(true)
+                        .start(() -> runSession(client));
             }
         } catch (Exception e) {
             System.err.println("Failed to start LSP server: " + e.getMessage());
-            System.err.println();
-            System.err.println("Note: LSP requires GraalVM with the LSP tool available.");
             e.printStackTrace();
             System.exit(1);
+        }
+    }
+
+    private static void runSession(java.net.Socket client) {
+        try (var session = new ReLangLspSession(client)) {
+            session.run();
+        } catch (IOException e) {
+            System.err.println("LSP session failed: " + e.getMessage());
         }
     }
 

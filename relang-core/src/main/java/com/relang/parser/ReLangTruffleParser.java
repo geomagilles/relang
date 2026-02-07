@@ -118,7 +118,15 @@ public class ReLangTruffleParser {
                         && !"<EOF>".equals(token.getText())
                         ? token.getText()
                         : null;
-                errors.add(new SyntaxError(line, charPositionInLine, msg, sourceSnippet));
+                var translated = SyntaxDiagnosticTranslator.translate(msg, sourceSnippet);
+                errors.add(new SyntaxError(
+                        translated.code(),
+                        line,
+                        charPositionInLine,
+                        translated.message(),
+                        sourceSnippet,
+                        translated.help()
+                ));
             }
         };
 
@@ -129,7 +137,11 @@ public class ReLangTruffleParser {
 
         var tree = parser.source();
         if (!errors.isEmpty()) {
-            throw new ReLangSyntaxException(errors);
+            throw new ReLangSyntaxException(
+                    errors,
+                    source != null ? source.getName() : null,
+                    source != null ? source.getCharacters().toString() : null
+            );
         }
         return tree;
     }

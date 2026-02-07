@@ -4,9 +4,8 @@ plugins {
 
 dependencies {
     implementation project(':relang-core')
-    implementation libs.graalvm.polyglot
-
-    runtimeOnly libs.graalvm.tools.lsp
+    implementation libs.graalvm.truffle.api
+    implementation libs.gson
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly libs.junit.platform.launcher

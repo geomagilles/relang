@@ -1,5 +1,7 @@
 package com.relang.parser;
 
+import com.relang.diagnostics.DiagnosticCode;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -292,7 +294,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         for (var p : ctx.typedParam()) {
             var name = p.ID().getText();
             if (p.typeRef() == null) {
-                addError(p, "Parameter '" + name + "' must have a type annotation");
+                addError(p, TypeDiagnostics.missingTypeAnnotation(name));
                 result.add(new ParamSignature(name, ReLangType.UnknownType.INSTANCE));
             } else {
                 result.add(new ParamSignature(name, resolveType(p.typeRef())));
@@ -414,8 +416,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (expected instanceof ReLangType.UnknownType || actual instanceof ReLangType.UnknownType) return;
         if (expected == null) return; // should not happen after inference, but guard
         if (!actual.isAssignableTo(expected)) {
-            addError(ctx, "Return type mismatch: expected " + expected.displayName()
-                    + " but got " + actual.displayName());
+            addError(ctx, TypeDiagnostics.returnTypeMismatch(expected, actual));
         }
     }
 
@@ -478,7 +479,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (operand instanceof ReLangType.UnknownType) return ReLangType.UnknownType.INSTANCE;
         if (operand instanceof ReLangType.IntType) return ReLangType.IntType.INSTANCE;
         if (operand instanceof ReLangType.FloatType) return ReLangType.FloatType.INSTANCE;
-        addError(ctx, "Cannot negate type " + operand.displayName() + ", expected Int or Float");
+        addError(ctx, TypeDiagnostics.invalidNegationOperand(operand));
         return ReLangType.UnknownType.INSTANCE;
     }
 
@@ -487,7 +488,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         var operand = visit(ctx.expr());
         if (operand instanceof ReLangType.UnknownType) return ReLangType.UnknownType.INSTANCE;
         if (!(operand instanceof ReLangType.BoolType)) {
-            addError(ctx, "Operator 'not' requires Bool, got " + operand.displayName());
+            addError(ctx, TypeDiagnostics.invalidNotOperand(operand));
         }
         return ReLangType.BoolType.INSTANCE;
     }
@@ -512,7 +513,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             case "<", "<=", ">", ">=" -> checkOrdering(op, leftType, rightType, ctx);
             case "==", "!=" -> checkEquality(op, leftType, rightType, ctx);
             default -> {
-                addError(ctx, "Unknown operator: " + op);
+                addError(ctx, TypeDiagnostics.unknownOperator(op));
                 yield ReLangType.UnknownType.INSTANCE;
             }
         };
@@ -523,7 +524,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (left instanceof ReLangType.FloatType && right instanceof ReLangType.FloatType) return ReLangType.FloatType.INSTANCE;
         if (left.isNumeric() && right.isNumeric()) return ReLangType.FloatType.INSTANCE;
         if (left instanceof ReLangType.StringType && right instanceof ReLangType.StringType) return ReLangType.StringType.INSTANCE;
-        addError(ctx, "Operator '+' cannot be applied to " + left.displayName() + " and " + right.displayName());
+        addError(ctx, TypeDiagnostics.invalidBinaryOperator("+", left, right, "Use two numeric operands or two String operands."));
         return ReLangType.UnknownType.INSTANCE;
     }
 
@@ -531,13 +532,13 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (left instanceof ReLangType.IntType && right instanceof ReLangType.IntType) return ReLangType.IntType.INSTANCE;
         if (left instanceof ReLangType.FloatType && right instanceof ReLangType.FloatType) return ReLangType.FloatType.INSTANCE;
         if (left.isNumeric() && right.isNumeric()) return ReLangType.FloatType.INSTANCE;
-        addError(ctx, "Operator '" + op + "' cannot be applied to " + left.displayName() + " and " + right.displayName());
+        addError(ctx, TypeDiagnostics.invalidBinaryOperator(op, left, right, "Use numeric operands for `" + op + "`."));
         return ReLangType.UnknownType.INSTANCE;
     }
 
     private ReLangType checkModulo(ReLangType left, ReLangType right, ReLangParser.ExprBinaryContext ctx) {
         if (left instanceof ReLangType.IntType && right instanceof ReLangType.IntType) return ReLangType.IntType.INSTANCE;
-        addError(ctx, "Operator '%' can only be applied to Int, got " + left.displayName() + " and " + right.displayName());
+        addError(ctx, TypeDiagnostics.invalidModuloOperands(left, right));
         return ReLangType.UnknownType.INSTANCE;
     }
 
@@ -545,7 +546,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (left instanceof ReLangType.IntType && right instanceof ReLangType.IntType) return ReLangType.BoolType.INSTANCE;
         if (left instanceof ReLangType.FloatType && right instanceof ReLangType.FloatType) return ReLangType.BoolType.INSTANCE;
         if (left.isNumeric() && right.isNumeric()) return ReLangType.BoolType.INSTANCE;
-        addError(ctx, "Operator '" + op + "' cannot be applied to " + left.displayName() + " and " + right.displayName());
+        addError(ctx, TypeDiagnostics.invalidBinaryOperator(op, left, right, "Use numeric operands for ordering comparisons."));
         return ReLangType.BoolType.INSTANCE;
     }
 
@@ -560,7 +561,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 && utL.name().equals(utR.name())) return ReLangType.BoolType.INSTANCE;
         // Product equality
         if (left instanceof ReLangType.ProductType && right instanceof ReLangType.ProductType) return ReLangType.BoolType.INSTANCE;
-        addError(ctx, "Operator '" + op + "' cannot be applied to " + left.displayName() + " and " + right.displayName());
+        addError(ctx, TypeDiagnostics.invalidBinaryOperator(op, left, right, "Compare values with compatible types."));
         return ReLangType.BoolType.INSTANCE;
     }
 
@@ -574,10 +575,10 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             return ReLangType.UnknownType.INSTANCE;
         }
         if (!(left instanceof ReLangType.BoolType)) {
-            addError(ctx, "Operator 'and' requires Bool operands, got " + left.displayName());
+            addError(ctx, TypeDiagnostics.logicalOperandMustBeBool("and", left));
         }
         if (!(right instanceof ReLangType.BoolType)) {
-            addError(ctx, "Operator 'and' requires Bool operands, got " + right.displayName());
+            addError(ctx, TypeDiagnostics.logicalOperandMustBeBool("and", right));
         }
         return ReLangType.BoolType.INSTANCE;
     }
@@ -590,10 +591,10 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             return ReLangType.UnknownType.INSTANCE;
         }
         if (!(left instanceof ReLangType.BoolType)) {
-            addError(ctx, "Operator 'or' requires Bool operands, got " + left.displayName());
+            addError(ctx, TypeDiagnostics.logicalOperandMustBeBool("or", left));
         }
         if (!(right instanceof ReLangType.BoolType)) {
-            addError(ctx, "Operator 'or' requires Bool operands, got " + right.displayName());
+            addError(ctx, TypeDiagnostics.logicalOperandMustBeBool("or", right));
         }
         return ReLangType.BoolType.INSTANCE;
     }
@@ -626,7 +627,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         var name = ctx.ID().getText();
         var type = currentScope.lookup(name);
         if (type == null) {
-            addError(ctx, "Undefined variable '" + name + "'");
+            addError(ctx, TypeDiagnostics.undefinedVariable(name));
             return ReLangType.UnknownType.INSTANCE;
         }
         return type;
@@ -644,7 +645,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         var funcName = ctx.ID().getText();
         var sig = functionSignatures.get(funcName);
         if (sig == null) {
-            addError(ctx, "Unknown function: " + funcName);
+            addError(ctx, TypeDiagnostics.unknownFunction(funcName));
             return ReLangType.UnknownType.INSTANCE;
         }
 
@@ -656,11 +657,9 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
         // Check arity
         if (argCount < sig.requiredCount()) {
-            addError(ctx, "Function '" + funcName + "' requires at least " + sig.requiredCount()
-                    + " arguments, got " + argCount);
+            addError(ctx, TypeDiagnostics.arityAtLeast(funcName, sig.requiredCount(), argCount));
         } else if (argCount > sig.params().size()) {
-            addError(ctx, "Function '" + funcName + "' accepts at most " + sig.params().size()
-                    + " arguments, got " + argCount);
+            addError(ctx, TypeDiagnostics.arityAtMost(funcName, sig.params().size(), argCount));
         }
 
         // Check arg types (positional only for now - named args don't change this logic much)
@@ -677,8 +676,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                     var paramType = sig.params().get(i).type();
                     if (!(paramType instanceof ReLangType.UnknownType) && !(argType instanceof ReLangType.UnknownType)) {
                         if (!argType.isAssignableTo(paramType)) {
-                            addError(ctx, "Argument " + (i + 1) + " of '" + funcName + "': expected "
-                                    + paramType.displayName() + " but got " + argType.displayName());
+                            addError(ctx, TypeDiagnostics.argumentTypeMismatch(funcName, i + 1, paramType, argType));
                         }
                     }
                 }
@@ -690,8 +688,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         var returnType = sig.returnType();
         if (returnType == null) {
             if (inferring.contains(funcName)) {
-                addError(ctx, "Cannot infer return type for recursive function '" + funcName
-                        + "'; add explicit return type annotation");
+                addError(ctx, TypeDiagnostics.recursiveReturnTypeInference(funcName));
             }
             return ReLangType.UnknownType.INSTANCE;
         }
@@ -709,7 +706,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         if (inner instanceof ReLangType.UnknownType) {
             return ReLangType.UnknownType.INSTANCE;
         }
-        addError(ctx, "Cannot await non-awaitable type " + inner.displayName());
+        addError(ctx, TypeDiagnostics.invalidAwaitOperand(inner));
         return ReLangType.UnknownType.INSTANCE;
     }
 
@@ -725,12 +722,12 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             if (typeInfo != null && typeInfo.fields().containsKey(fieldName)) {
                 return typeInfo.fields().get(fieldName);
             }
-            addError(ctx, "No field '" + fieldName + "' in type " + ut.name());
+            addError(ctx, TypeDiagnostics.unknownFieldInType(fieldName, ut.name()));
             return ReLangType.UnknownType.INSTANCE;
         }
         if (receiverType instanceof ReLangType.UnknownType) return ReLangType.UnknownType.INSTANCE;
 
-        addError(ctx, "Cannot access field '" + fieldName + "' on type " + receiverType.displayName());
+        addError(ctx, TypeDiagnostics.unknownFieldOnType(fieldName, receiverType));
         return ReLangType.UnknownType.INSTANCE;
     }
 
@@ -739,7 +736,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         var typeName = ctx.ID().getText();
         var typeInfo = userTypes.get(typeName);
         if (typeInfo == null) {
-            addError(ctx, "Unknown type: " + typeName);
+            addError(ctx, TypeDiagnostics.unknownType(typeName));
             return ReLangType.UnknownType.INSTANCE;
         }
 
@@ -752,17 +749,16 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
             var expectedType = typeInfo.fields().get(fieldName);
             if (expectedType == null) {
-                addError(fi, "Unknown field '" + fieldName + "' in type " + typeName);
+                addError(fi, TypeDiagnostics.unknownFieldInConstruction(fieldName, typeName));
             } else if (!(exprType instanceof ReLangType.UnknownType) && !exprType.isAssignableTo(expectedType)) {
-                addError(fi, "Field '" + fieldName + "': expected " + expectedType.displayName()
-                        + " but got " + exprType.displayName());
+                addError(fi, TypeDiagnostics.fieldTypeMismatch(fieldName, expectedType, exprType));
             }
         }
 
         // Check all required fields are provided
         for (var requiredField : typeInfo.fields().keySet()) {
             if (!providedFields.contains(requiredField)) {
-                addError(ctx, "Missing field '" + requiredField + "' in " + typeName + " construction");
+                addError(ctx, TypeDiagnostics.missingField(requiredField, typeName));
             }
         }
 
@@ -780,7 +776,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
             var declaredType = resolveType(ctx.typeRef());
             if (!(declaredType instanceof ReLangType.UnknownType) && !(rhsType instanceof ReLangType.UnknownType)) {
                 if (!rhsType.isAssignableTo(declaredType)) {
-                    addError(ctx, "Cannot assign " + rhsType.displayName() + " to variable of declared type " + declaredType.displayName());
+                    addError(ctx, TypeDiagnostics.declaredAssignmentMismatch(declaredType, rhsType));
                 }
             }
             currentScope.define(varName, declaredType);
@@ -798,17 +794,16 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
 
         var existingType = currentScope.lookup(varName);
         if (existingType == null) {
-            addError(ctx, "Undefined variable '" + varName + "'");
+            addError(ctx, TypeDiagnostics.undefinedVariable(varName));
         } else {
             // Check parameter immutability
             if (currentScope.isParameter(varName)) {
-                addError(ctx, "Cannot reassign parameter '" + varName + "'; parameters are immutable. Use 'let " + varName + " = ...' to shadow instead");
+                addError(ctx, TypeDiagnostics.immutableParameterReassignment(varName));
             }
             // Check type compatibility
             if (!(existingType instanceof ReLangType.UnknownType) && !(rhsType instanceof ReLangType.UnknownType)) {
                 if (!rhsType.isAssignableTo(existingType)) {
-                    addError(ctx, "Cannot assign " + rhsType.displayName() + " to variable of type "
-                            + existingType.displayName());
+                    addError(ctx, TypeDiagnostics.assignmentMismatch(existingType, rhsType));
                 }
             }
         }
@@ -994,7 +989,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                 var patType = visit(pec.expr());
                 // In subjectless match, non-wildcard patterns should evaluate to Bool
                 if (!(patType instanceof ReLangType.UnknownType) && !(patType instanceof ReLangType.BoolType)) {
-                    addError(pec, "Subjectless match pattern must be Bool, got " + patType.displayName());
+                    addError(pec, TypeDiagnostics.invalidSubjectlessMatchPattern(patType));
                 }
             }
             // Wildcard and none patterns are always ok
@@ -1017,14 +1012,14 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
     private void checkBoolCondition(ReLangType condType, org.antlr.v4.runtime.ParserRuleContext ctx, String keyword) {
         if (condType instanceof ReLangType.UnknownType) return;
         if (!(condType instanceof ReLangType.BoolType)) {
-            addError(ctx, "Condition must be Bool, got " + condType.displayName());
+            addError(ctx, TypeDiagnostics.invalidCondition(keyword, condType));
         }
     }
 
     private void checkIntBound(ReLangType boundType, org.antlr.v4.runtime.ParserRuleContext ctx, String label) {
         if (boundType instanceof ReLangType.UnknownType) return;
         if (!(boundType instanceof ReLangType.IntType)) {
-            addError(ctx, label + " must be Int, got " + boundType.displayName());
+            addError(ctx, TypeDiagnostics.invalidRangeBound(label, boundType));
         }
     }
 
@@ -1067,7 +1062,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                     if (braceDepth > 0) j++;
                 }
                 if (braceDepth != 0) {
-                    addError(parentCtx, "Unclosed interpolation in string");
+                    addError(parentCtx, TypeDiagnostics.unclosedInterpolation());
                     return;
                 }
                 // Parse and type-check the expression
@@ -1078,7 +1073,7 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
                     var exprCtx = parser.expr();
                     visit(exprCtx);
                 } catch (Exception e) {
-                    addError(parentCtx, "Invalid expression in string interpolation: " + exprText);
+                    addError(parentCtx, TypeDiagnostics.invalidInterpolationExpression(exprText));
                 }
                 i = j + 1;
             } else {
@@ -1087,10 +1082,14 @@ public class ReLangTypeChecker extends ReLangBaseVisitor<ReLangType> {
         }
     }
 
-    private void addError(org.antlr.v4.runtime.ParserRuleContext ctx, String message) {
+    private void addError(org.antlr.v4.runtime.ParserRuleContext ctx, TypeDiagnostics.Spec diagnostic) {
+        addError(ctx, diagnostic.code(), diagnostic.message(), diagnostic.help());
+    }
+
+    private void addError(org.antlr.v4.runtime.ParserRuleContext ctx, DiagnosticCode code, String message, String help) {
         int line = ctx.getStart().getLine();
         int col = ctx.getStart().getCharPositionInLine();
         var snippet = ctx.getText();
-        errors.add(new TypeError(line, col, message, snippet));
+        errors.add(new TypeError(code, line, col, message, snippet, help));
     }
 }
